@@ -141,7 +141,7 @@ class HandDetector(Module):
             Ein leeres Dictionary.
             
         """
-        model_path = get_nested_key(data, 'config.hand_model_path', default = 'hand_landmarker.task')
+        model_path = get_nested_key(data, 'config.hand_model_path', default = 'hand_landmarker.task') # get_nested_key dient dazu sicher den schlüssel(key) in verschachtelten dictionary zu erhalten
         base_options = python.BaseOptions(model_asset_path = model_path)
         options = vision.HandLandmarkerOptions(base_options = base_options, 
                                                num_hands = 2)
