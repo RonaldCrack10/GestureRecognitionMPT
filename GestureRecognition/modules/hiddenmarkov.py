@@ -64,6 +64,8 @@ class HMMModule(Module):
         **kwargs
             Weitere Parameter, die an :class:`Module` weitergegeben werden.
         """
+        self.OutputSignal = self.OutputSignal
+        self.model_path = model_path
         super().__init__(
             inputSignals=["config", "preprocessor"],
             outputSchema={"type": "object", "properties": {outputSignal: {}}},
@@ -107,6 +109,8 @@ class HMMModule(Module):
         dict
             Ein leeres Dictionary.
         """
+        model_path = get_nested_key(data, 'config.hmm_model_path', default= self.model_path) 
+        self.model = HMM.load(model_path)
         return {}
 
     def step(self, data):
@@ -169,7 +173,33 @@ class HMMModule(Module):
 
             ``return {outputSignal: result, "galy": galy}``
         """
-        return {}
+        trajectory = get_nested_key(data, 'preprocessor')
+        if trajectory is None:
+            return {}
+        
+        # score für jede klasse berechnen
+        score = self.model.predict(trajectory)
+
+        # beste klasse bestimmen
+        best_label = max(score, key = score.get)
+        best_score = score[best_label]
+        results = {"label": best_label, "score": best_score, "scores": score}
+
+        galy = GALY()
+        layer = galy.new_layer()
+
+        width  = get_nested_key(data, 'config.width',  default=640)
+        height = get_nested_key(data, 'config.height', default=480)
+
+        galy.putText(
+            layer,
+            f"{best_label}: {best_score:.2f}",
+            (int(width * 0.05), int(height * 0.1)),
+            scale=1.5,
+            color=bgr("#00FF00")
+        )
+
+        return {self.OutputSignal: results, 'galy': galy}
 
     def stop(self, data):
         """
