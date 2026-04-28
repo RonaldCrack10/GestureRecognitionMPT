@@ -64,7 +64,7 @@ class HMMModule(Module):
         **kwargs
             Weitere Parameter, die an :class:`Module` weitergegeben werden.
         """
-        self.OutputSignal = self.OutputSignal
+        self.OutputSignal = outputSignal
         self.model_path = model_path
         super().__init__(
             inputSignals=["config", "preprocessor"],
