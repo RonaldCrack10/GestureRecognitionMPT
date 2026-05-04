@@ -93,12 +93,22 @@ class HandDetector(Module):
         outputSignal : str, optional
             Name des erzeugten Output-Signals.
         """
+        self.outputSignal = outputSignal
+
         super().__init__(
-            inputSignals=["config", "webcam"],
-            outputSchema={"type": "object", "properties": {outputSignal: {}}},
-            name="detector",
+            name = 'HandDetector',
+            inputSignal = ['config', 'webcam'],
+            outputSchema = {
+                'type' : 'object',
+                'properties': {
+                    outputSignal : {}
+
+                }
+            }
+
         )
 
+        
     def start(self, data):
         """
         Initialisierung des Moduls.
@@ -129,7 +139,15 @@ class HandDetector(Module):
         -------
         dict
             Ein leeres Dictionary.
+            
         """
+        model_path = get_nested_key(data, 'config.hand_model_path', default = 'hand_landmarker.task') # get_nested_key dient dazu sicher den schlüssel(key) in verschachtelten dictionary zu erhalten
+        base_options = python.BaseOptions(model_asset_path = model_path)
+        options = vision.HandLandmarkerOptions(base_options = base_options, 
+                                               num_hands = 2)
+        self.detector = vision.HandLandmarker.create_from_options(options)
+        
+    
         return {}
 
     def step(self, data):
@@ -184,7 +202,19 @@ class HandDetector(Module):
 
             ``return {outputSignal: result, "galy": galy}``
         """
-        return {}
+
+        frame = get_nested_key(data, 'webcam') # receive frame from webcam signal 
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # convert the color canal from bgr to rgb
+        mp_image = mp.Image(image_format = mp.ImageFormat.SRGB, data = rgb_frame) # converting each frame in the correct image format as mediapipe wants
+
+        results = self.detector.detect(mp_image) # detection of landmarks
+
+        # landmarks visualisieren
+        galy = GALY(frame) 
+        for hand_landmarks in results.hand_landmarks:
+            draw_hand_landmarks(hand_landmarks, galy)
+
+        return {self.outputSignal: results, "galy": galy}
 
     def stop(self, data):
         """
@@ -206,4 +236,5 @@ class HandDetector(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        self.detector.close()
+        
