@@ -1,4 +1,4 @@
-from SignalHub import GALY, bgr, get_nested_key, Module, HMM
+from SignalHub import GALY, bgr, get_nested_key, Module
 
 
 class HMMModule(Module):
