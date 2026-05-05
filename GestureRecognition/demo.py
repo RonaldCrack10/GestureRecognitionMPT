@@ -1,5 +1,8 @@
 from SignalHub import Engine, ConfigParser, Webcam
-from GestureRecognition.modules import *
+from GestureRecognition.modules.handdetector import HandDetector
+from GestureRecognition.modules.trailmarker import TrailMarker
+from GestureRecognition.modules.preprocessor import Preprocessor
+from GestureRecognition.modules.hiddenmarkov import HMMModule
 import argparse
 
 def run(parser: argparse.ArgumentParser):
@@ -9,7 +12,7 @@ def run(parser: argparse.ArgumentParser):
     parser.add_argument("--webcam.width", required=False)
     modules = [
         ConfigParser(parser),
-        # Webcam(),
+        Webcam(),
         HandDetector(),
         TrailMarker(),
         Preprocessor(),
