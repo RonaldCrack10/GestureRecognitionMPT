@@ -1,5 +1,6 @@
 from SignalHub import GALY, get_nested_key, Module
 from collections import deque
+import numpy as np
 
 class Preprocessor(Module):
     """
@@ -57,6 +58,7 @@ class Preprocessor(Module):
         outputSignal : str, optional
             Name des erzeugten Output-Signals.
         """
+        self.outputSignal = outputSignal
         super().__init__(
             inputSignals=["config", "detector"],
             outputSchema={"type": "object", "properties": {outputSignal: {}}},
@@ -104,7 +106,20 @@ class Preprocessor(Module):
         dict
             Ein leeres Dictionary.
         """
+        
+        # Konfigurationsparameter laden
+        self.finger_index = get_nested_key('config.track_finger_index', data, default=8) # 8 = Zeigefingerspitze
+        self.max_points = get_nested_key('config.trajectory_length', data, default=30)
+        
+        # WICHTIG: Dieser Parameter wurde in 'step' verwendet, muss hier aber initialisiert werden
+        self.max_lost_frames = get_nested_key('config.max_lost_frames', data, default=5)
+        
+        # Interne Zustände vorbereiten
+        self.trajectory = deque(maxlen=self.max_points)
+        self.lost_frames_counter = 0
+
         return {}
+        
 
     def step(self, data):
         """
@@ -164,7 +179,45 @@ class Preprocessor(Module):
 
             ``return {outputSignal: trajectory}``
         """
-        return {}
+        detector_results = get_nested_key('detector', data)
+        current_point = None
+
+        # 1. Punkt extrahieren (MediaPipe Landmarks nutzen x, y Koordinaten)
+        if detector_results and detector_results.hand_landmarks:
+            # Wir nehmen die erste erkannte Hand
+            landmarks = detector_results.hand_landmarks[0]
+            
+            # Punkt holen und zur Trajektorie hinzufügen
+            current_point = (landmarks[self.finger_index].x, landmarks[self.finger_index].y)
+            self.trajectory.append(current_point)
+            
+            # Counter zurücksetzen, da Hand gefunden wurde
+            self.lost_frames_counter = 0
+        else:
+            # Hand verloren -> Zähler erhöhen
+            self.lost_frames_counter += 1
+
+        # 2. Reset bei zu langem Tracking-Verlust
+        if self.lost_frames_counter > self.max_lost_frames:
+            self.trajectory.clear()
+
+        # 3. Trajektorie verarbeiten, wenn genug Punkte (Fenster voll) vorhanden sind
+        if len(self.trajectory) == self.max_points:
+            # In numpy array umwandeln (Shape: N, 2)
+            traj_arr = np.array(list(self.trajectory))
+            
+            # NORMALISIERUNG: Trajektorie auf den Ursprung (0,0) zentrieren
+            # Mittelwert abziehen: Verschiebt die Bewegung ins Zentrum
+            center = traj_arr.mean(axis=0)
+            normalized_traj = traj_arr - center
+            
+            # Optional: Hier könnte man noch auf eine Standardgröße skalieren (Min-Max Normalisierung)
+            
+            return {self.outputSignal: normalized_traj}
+
+        # Falls noch nicht genug Punkte gesammelt wurden
+        return {self.outputSignal: None}
+
 
     def stop(self, data):
         """
@@ -186,4 +239,5 @@ class Preprocessor(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        if hasattr(self, 'trajectory'):
+            self.trajectory.clear()
