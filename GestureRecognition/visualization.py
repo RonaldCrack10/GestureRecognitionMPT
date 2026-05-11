@@ -1,4 +1,11 @@
-def visualize_dataset():
+import pickle
+from cProfile import label
+
+import matplotlib.pyplot as plt
+import os
+import numpy as np
+
+def visualize_dataset(label_pfad, label_name):
     """
     TODO: Visualisierung des eigenen Datensatzes
 
@@ -48,7 +55,69 @@ def visualize_dataset():
     - Mittelwerte oder typische Sequenzen pro Klasse darstellen
     - Ausreißer automatisch erkennen
     """
-    pass
+    print(f"Loading Data from Ordner: {label_pfad} ...")
+
+    plt.figure(figsize=(8, 8))
+    dateien_gefunden = False
+
+    # Geht durch alle Dateien im angegebenen Ordner
+    for filename in os.listdir(label_pfad):
+        if not filename.endswith(".pkl"):
+            continue
+
+        dateien_gefunden = True
+        pfad = os.path.join(label_pfad, filename)
+
+        try:
+            with open(pfad, "rb") as f:
+                recording_data = pickle.load(f)
+        except Exception as e:
+            print(f"Fehler beim Laden von {filename}: {e}")
+            continue
+
+        if 'preprocessor' not in recording_data:
+            continue
+
+        complete_sequence = None   #enthält die Koordinaten aller Frames, normalisiert und skaliert
+        max_length = 0
+
+        for frame_dict in recording_data['preprocessor']:
+            if frame_dict is None:
+                continue
+            frame_daten = frame_dict.get('preprocessor')
+
+            if frame_daten is not None and len(frame_daten) > max_length:
+                max_length = len(frame_daten)
+                complete_sequence = frame_daten
+
+        # Wenn wir eine fertige Trajektorie gefunden haben;
+        if complete_sequence is not None:
+            x_werte = complete_sequence[:, 0]
+            y_werte = complete_sequence[:, 1]
+
+            plt.plot(x_werte, y_werte, marker='o', markersize=2, alpha=0.5)
+
+    if not dateien_gefunden:
+        print(f"Keine .pkl Dateien im Ordner {label_pfad} gefunden!")
+        return
+
+    plt.title(f"Visualisierung Datensatz: {label_name}\n(Alle Aufnahmen übereinander)", fontsize=14)
+    plt.xlabel("X-Koordinate (normalisiert)")
+    plt.ylabel("Y-Koordinate (normalisiert)")
+
+    plt.grid(True, linestyle='--', alpha=0.7)
+
+
+    #plt.gca().invert_yaxis()
+    plt.axis('equal')
+    plt.show()
+
+#Test mit Buchstabe O
+if __name__ == "__main__":
+    test_ordner_O = r"C:\Users\Evran\GestureRecognitionMPT\recordings\O"
+    visualize_dataset(test_ordner_O, "Buchstabe O")
+
+
 
 def evaluate_classifier():
     """
@@ -102,7 +171,6 @@ def evaluate_classifier():
     - Vergleich verschiedener Modelle
     """
     pass
-
 
 def replay_recordings():
     """
