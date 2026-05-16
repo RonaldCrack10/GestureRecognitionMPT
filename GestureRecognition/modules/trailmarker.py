@@ -118,8 +118,10 @@ class TrailMarker(Module):
         
         # return {}
         self.finger_idx = data.get("config", {}).get("preprocessor", {}).get("finger_idx", 8)
-        self.history = []
+        self.history = deque(maxlen=100)
         self.outputSignal = "trailmarker"
+        self.lost       = 0
+        self.max_lost   = data.get("config", {}).get("preprocessor", {}).get("max_lost", 10)
         return {}
 
     def step(self, data):
@@ -175,85 +177,63 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-        # # 1. Daten aus den Signalen holen
-        # results = data.get("detector")
-        # img = data.get("webcam")
+     
+        # hand_landmarks = data.get("detector")
+        # img = data.get("webcam") # Bild abrufen
         
         # galy = GALY()
+        # # galy.blit("webcam", (0, 0))
         # galy.layer("trail")
 
-        # # 2. Prüfen: Haben wir ein Bild UND hat der Detector Hände gefunden?
-        # if img is not None and results and results.hand_landmarks:
-        #     h, w, _ = img.shape
+        # if hand_landmarks is not None and img is not None:
+        #     self.lost = 0
+        #     img_h, img_w, _ = img.shape
             
-        #     # Wir nehmen die erste Hand aus der Liste
-        #     hand = results.hand_landmarks[0]
+        #     if len(hand_landmarks.hand_landmarks) > 0:
+        #       print(len(hand_landmarks.hand_landmarks))
+        #       x = int(hand_landmarks.hand_landmarks[0][self.finger_idx].x * img_w) # ich betrachte mit hand_landmarks.hand_landmarks[0][self.finger_idx] die {self.finger_idx} te Finger der 1 Hand
+        #       y = int(hand_landmarks.hand_landmarks[0][self.finger_idx].y * img_h)
             
-        #     # Landmark 4 (Daumenspitze) und 8 (Zeigefingerspitze)
-        #     thumb = hand[4]
-        #     index = hand[8]
-            
-        #     # 3. ABSTAND BERECHNEN (Pinch-Logik)
-        #     # Wir rechnen hier nur mit X und Y
-        #     dist = math.sqrt((thumb.x - index.x)**2 + (thumb.y - index.y)**2)
-            
-        #     # DEBUG: Damit du in der Konsole siehst, wie nah deine Finger sind
-        #     # print(f"Aktueller Abstand: {dist:.4f}") 
-
-        #     # 4. SCHWELLENWERT (Wir setzen ihn auf 0.1, das ist großzügiger)
-        #     if dist < 0.1:
-        #         # WICHTIG: Hier rechnen wir die 0.0-1.0 Werte in echte Pixel um!
-        #         pixel_x = int(index.x * w)
-        #         pixel_y = int(index.y * h)
-                
-        #         self.history.append((pixel_x, pixel_y))
-        #         self.lost_frames_counter = 0
+        #       self.history.append((x, y))
+        #       print("Len of History: ",self.history)
         #     else:
-        #         # Finger sind offen -> Wir zeichnen nicht weiter
-        #         pass
+        #         self.history.clear()
         # else:
-        #     # Keine Hand im Bild
-        #     self.lost_frames_counter += 1
-
-        # # Wenn Hand zu lange weg: Alles löschen
-        # if self.lost_frames_counter > 10:
         #     self.history.clear()
 
-        # # 5. ZEICHNEN
-        # points = list(self.history)
-        # if len(points) > 1:
-        #     for i in range(1, len(points)):
-        #         # Zeichne eine dicke gelbe Linie
-        #         galy.line(points[i-1], points[i], (0, 255, 255), 5)
+        # if len(self.history) > 1:
+        #     history_list = list(self.history)
+        #     for i in range(1, len(history_list)):
+        #         pt1 = history_list[i - 1]
+        #         pt2 = history_list[i]
+        #         galy.line(pt1, pt2, (255, 255, 0), thickness=4)
 
         # return {self.outputSignal: {}, "galy": galy}
-        hand_landmarks = data.get("detector")
-        img = data.get("webcam") # Bild abrufen
-        
+        result = data.get("detector")
+        img    = data.get("webcam")
+
         galy = GALY()
+        
         galy.layer("trail")
 
-        if hand_landmarks and img is not None:
+        if result is not None and img is not None and result.hand_landmarks:
+            self.lost = 0
             img_h, img_w, _ = img.shape
-            
-            if len(hand_landmarks.hand_landmarks) > 0:
-              print(len(hand_landmarks.hand_landmarks))
-              x = int(hand_landmarks.hand_landmarks[0][self.finger_idx].x * img_w) # ich betrachte mit hand_landmarks.hand_landmarks[0][self.finger_idx] die {self.finger_idx} te Finger der 1 Hand
-              y = int(hand_landmarks.hand_landmarks[0][self.finger_idx].y * img_h)
-            
-              self.history.append((x, y))
-              print("Len of History: ",self.history)
-            else:
-                self.history.clear()
-        else:
-            self.history.clear()
 
-        if len(self.history) > 1:
-            history_list = list(self.history)
-            for i in range(1, len(history_list)):
-                pt1 = history_list[i - 1]
-                pt2 = history_list[i]
-                galy.line(pt1, pt2, (255, 255, 0), thickness=4)
+            lm = result.hand_landmarks[0][self.finger_idx]
+            x  = int(lm.x * img_w)
+            y  = int(lm.y * img_h)
+            self.history.append((x, y))
+        else:
+            
+                self.history.clear()
+
+       # Spur zeichnen
+        points = list(self.history)
+        n = len(points)
+        for i in range(1, n):
+            galy.line(points[i-1], points[i], (255, 255, 0), thickness= 2)
+            
 
         return {self.outputSignal: {}, "galy": galy}
 
