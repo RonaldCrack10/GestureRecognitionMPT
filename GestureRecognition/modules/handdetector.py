@@ -20,6 +20,14 @@ def draw_hand_landmarks(hand_landmarks, galy: GALY):
         "pinky_finger":  {"color": bgr("#FF00FF")},
         "palm":          {"color": bgr("#C8C8C8")},
     }
+    connections = {
+        "thumb":         [(0,1), (1,2), (2,3), (3,4)],
+        "index_finger":  [(0,5), (5,6), (6,7), (7,8)],
+        "middle_finger": [(9,10), (10,11), (11,12)],
+        "ring_finger":   [(13,14), (14,15), (15,16)],
+        "pinky_finger":  [(17,18), (18,19), (19,20)],
+        "palm":          [(0,17), (5,9), (9,13), (13,17)]
+    }
     x = np.inf
     y = np.inf
     for key in lm.keys():
@@ -151,7 +159,7 @@ class HandDetector(Module):
         model_path = get_nested_key('config.hand_model_path', data,  default = 'hand_landmarker.task') # get_nested_key dient dazu sicher den schlüssel(key) in verschachtelten dictionary zu erhalten
         base_options = mp.tasks.BaseOptions(model_asset_path = model_path)
         options = vision.HandLandmarkerOptions(base_options = base_options, 
-                                               num_hands = 2)
+                                               num_hands = 1)
         # self.detector = mp_hands.Hands(
         #     static_image_mode=False,
         #     max_num_hands=1,
