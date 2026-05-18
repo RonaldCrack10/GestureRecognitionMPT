@@ -4,34 +4,11 @@ import pickle
 import subprocess
 import numpy as np
 from pathlib import Path
-
-if sys.platform == "win32":
-    import msvcrt
-    def getch():
-        return msvcrt.getch()
-else:
-    def getch():
-        import tty, termios
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            return sys.stdin.read(1).encode()
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+import msvcrt
 
 
-def _clean(raw: list) -> list | None:
-    """
-    Entfernt Frames ohne erkannte Hand am Anfang und Ende.
-    Gibt None zurück wenn weniger als 15 brauchbare Frames übrig bleiben.
-    """
-    MIN_FRAMES = 15
-
-    # Nur Frames behalten wo preprocessor-Daten vorhanden sind
-    frames = [f for f in raw if f.get("preprocessor") is not None]
-
-    return frames if len(frames) >= MIN_FRAMES else None
+def getch():
+    return msvcrt.getch()
 
 def data_labeling(times: int, label: str):
     """
@@ -106,41 +83,38 @@ def data_labeling(times: int, label: str):
         Name der Geste / Klasse.
         Kann ebenfalls frei gestaltet werden (z. B. dynamische Labels, mehrere Klassen gleichzeitig).
     """
-    save_dir = Path("data") / "raw" / label
-    save_dir.mkdir(parents=True, exist_ok=True)
+    save_dir = Path("data")/ "raw" / label
+    save_dir.mkdir(exist_ok = True, parents = True)
 
-    saved   = 0
+    saved = 0
     attempt = 0
 
     while saved < times:
         attempt += 1
         tmp_path = save_dir / f"tmp_{attempt}.pickle"
+        print(f"\n[{label}] Aufnahme {saved + 1} / {times}")
+        print("Geste ausführen, dann: ")
+        print(" ESC = speichern, andere Taste verwerfen, q = beenden")
 
-        print(f"\n[{label}] Aufnahme {saved+1}/{times}")
-        print("  Geste ausführen → ESC = speichern | andere Taste = verwerfen | q = beenden")
-
-        # SignalHub Demo als Subprocess starten mit Recorder
         proc = subprocess.Popen([
             sys.executable,
             "GestureRecognition/demo.py",
-            "--recorder.file", str(tmp_path),
+            "--recorder.file", str(tmp_path)
         ])
 
-        key = getch()          # blockiert bis Taste gedrückt
+        key = getch()
         proc.terminate()
         proc.wait()
 
-        # q → komplett abbrechen
         if key in (b'q', b'Q'):
             if tmp_path.exists():
                 tmp_path.unlink()
             print("Abgebrochen.")
             break
 
-        # ESC → speichern
-        if key == b'\x1b':
+        if key == b'\x1b':  # ESC → speichern
             if not tmp_path.exists():
-                print("  ✗ Keine Datei erzeugt — verworfen.")
+                print("  ✗ Keine Datei erzeugt.")
                 continue
 
             with open(tmp_path, "rb") as f:
@@ -160,8 +134,7 @@ def data_labeling(times: int, label: str):
             saved += 1
             print(f"  ✓ Gespeichert: {out}  ({len(cleaned)} Frames)")
 
-        # andere Taste → verwerfen
-        else:
+        else:  # andere Taste → verwerfen
             if tmp_path.exists():
                 tmp_path.unlink()
             print("  ✗ Verworfen.")
@@ -245,7 +218,7 @@ def dataset_building(output_path):
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     MIN_FRAMES = 15
-    dataset    = {}   # { label: [np.ndarray(N,2), ...] }
+    dataset    = {}
 
     for label_dir in sorted(raw_dir.iterdir()):
         if not label_dir.is_dir():
@@ -258,17 +231,15 @@ def dataset_building(output_path):
             with open(pkl, "rb") as f:
                 frames = pickle.load(f)
 
-            # Letzten Punkt jeder gespeicherten Trajektorie extrahieren
-            # preprocessor liefert np.ndarray (N,2) — wir nehmen den
-            # aktuellen Fingertipp (letzter Punkt) als Feature pro Frame
+            # preprocessor-Signal aus jedem Frame extrahieren
             points = []
             for frame in frames:
                 traj = frame.get("preprocessor")
                 if traj is not None and len(traj) > 0:
-                    points.append(traj[-1])   # (x, y) normalisiert
+                    points.append(traj[-1])  # letzter Punkt der Trajektorie
 
             if len(points) < MIN_FRAMES:
-                print(f"  ✗ {label}/{pkl.name}: nur {len(points)} Frames — übersprungen")
+                print(f"  ✗ {label}/{pkl.name}: {len(points)} Frames — übersprungen")
                 continue
 
             seq = _normalize(np.array(points, dtype=np.float32))
@@ -289,7 +260,7 @@ def dataset_building(output_path):
         pickle.dump(dataset, f)
 
     total = sum(len(v) for v in dataset.values())
-    print(f"Dataset gespeichert → {output_path}")
+    print(f"\nDataset gespeichert → {output_path}")
     print(f"{len(dataset)} Klassen, {total} Sequenzen gesamt")
     for lbl, seqs in dataset.items():
         lens = [len(s) for s in seqs]
@@ -298,13 +269,14 @@ def dataset_building(output_path):
 
 
 def _normalize(pts: np.ndarray) -> np.ndarray:
-    """Zentriert und skaliert (N,2)-Array auf [-1, 1]."""
     pts = pts - pts.mean(axis=0)
     d   = np.linalg.norm(pts, axis=1).max()
     if d > 1e-6:
         pts /= d
     return pts
 
+    
+
 if __name__ == '__main__':
-    data_labeling(times = 5, label = 'circle')
-    dataset_building("dataset/data.pickle")
+    data_labeling(times = 5, label = "A")
+    dataset_building(output_path="data/dataset.pickle")
