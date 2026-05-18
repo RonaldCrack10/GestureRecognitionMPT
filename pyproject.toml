@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "getch" ; sys_platform == "linux",
     "mediapipe>=0.10.32",
     "signalhub",
     "tqdm>=4.67.3",
