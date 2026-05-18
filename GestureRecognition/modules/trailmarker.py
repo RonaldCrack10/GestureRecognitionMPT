@@ -178,37 +178,7 @@ class TrailMarker(Module):
             ``return { ..., "galy": galy}``
         """
      
-        # hand_landmarks = data.get("detector")
-        # img = data.get("webcam") # Bild abrufen
-        
-        # galy = GALY()
-        # # galy.blit("webcam", (0, 0))
-        # galy.layer("trail")
-
-        # if hand_landmarks is not None and img is not None:
-        #     self.lost = 0
-        #     img_h, img_w, _ = img.shape
-            
-        #     if len(hand_landmarks.hand_landmarks) > 0:
-        #       print(len(hand_landmarks.hand_landmarks))
-        #       x = int(hand_landmarks.hand_landmarks[0][self.finger_idx].x * img_w) # ich betrachte mit hand_landmarks.hand_landmarks[0][self.finger_idx] die {self.finger_idx} te Finger der 1 Hand
-        #       y = int(hand_landmarks.hand_landmarks[0][self.finger_idx].y * img_h)
-            
-        #       self.history.append((x, y))
-        #       print("Len of History: ",self.history)
-        #     else:
-        #         self.history.clear()
-        # else:
-        #     self.history.clear()
-
-        # if len(self.history) > 1:
-        #     history_list = list(self.history)
-        #     for i in range(1, len(history_list)):
-        #         pt1 = history_list[i - 1]
-        #         pt2 = history_list[i]
-        #         galy.line(pt1, pt2, (255, 255, 0), thickness=4)
-
-        # return {self.outputSignal: {}, "galy": galy}
+      
         result = data.get("detector")
         img    = data.get("webcam")
 
@@ -218,6 +188,7 @@ class TrailMarker(Module):
 
         if result is not None and img is not None and result.hand_landmarks:
             self.lost = 0
+            
             img_h, img_w, _ = img.shape
 
             lm = result.hand_landmarks[0][self.finger_idx]
