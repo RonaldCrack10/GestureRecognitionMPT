@@ -233,7 +233,7 @@ class HandDetector(Module):
 
         # landmarks visualisieren
         galy = GALY()
-        galy.blit("webcam", (0, 0))
+        # galy.blit("webcam", (0, 0))
         galy.layer("landmarks") 
         if results.hand_landmarks:
             for hand_landmarks in results.hand_landmarks:
