@@ -2,7 +2,7 @@ engine:
   speed: 4
   autoclose: False
 recorder:
-  file: record/test.pickle
+  file: data/raw/temp_recording.pickle
   replay:
     - trailmarker
     - preprocessor
@@ -10,8 +10,8 @@ recorder:
     - detector
 webcam:
   deviceIndex: 0
-  width: 640
-  height: 360
+  width: 1280
+  height: 720
   dtype: u8
   flip: True
 preprocessor:

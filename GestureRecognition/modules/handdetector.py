@@ -11,7 +11,7 @@ mp_hand = mp.tasks.vision.HandLandmarksConnections
 
 
 def draw_hand_landmarks(hand_landmarks, galy: GALY):
-    height, width = 480, 640
+    height, width = 720, 1280
     lm = {
         "thumb":         {"color": bgr("#0000FF")},
         "index_finger":  {"color": bgr("#00FF00")},
