@@ -15,7 +15,7 @@ def run(parser: argparse.ArgumentParser):
         Webcam(),
         HandDetector(),
         TrailMarker(),
-        Preprocessor(),
+        Preprocessor()
         # HMMModule(),
     ]
     engine = Engine(modules=modules, signals={})
