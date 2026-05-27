@@ -2,7 +2,7 @@ engine:
   speed: 4
   autoclose: False
 recorder:
-  file: data/raw/temp_recording.pickle
+  file: record/test.pickle
   replay:
     - trailmarker
     - preprocessor

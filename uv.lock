@@ -332,7 +332,9 @@ name = "gesturerecognition"
 version = "0.1.1"
 source = { virtual = "." }
 dependencies = [
+    { name = "getch", marker = "sys_platform == 'linux'" },
     { name = "mediapipe" },
+    { name = "pyyaml" },
     { name = "signalhub" },
     { name = "tqdm" },
 ]
@@ -345,7 +347,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "getch", marker = "sys_platform == 'linux'" },
     { name = "mediapipe", specifier = ">=0.10.32" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "signalhub", git = "https://github.com/jaboll-ai/SignalHub.git?rev=pyproject" },
     { name = "tqdm", specifier = ">=4.67.3" },
 ]
@@ -355,6 +359,12 @@ dev = [
     { name = "sphinx", specifier = ">=9.1.0" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
 ]
+
+[[package]]
+name = "getch"
+version = "1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cc/a4/c696c05e0ff9d05b1886cb0210101083db7d330ff964a6d7cd98ad2b2064/getch-1.0.tar.gz", hash = "sha256:a6c22717c10051ce65b8fb7bddb171af705b1175e694a73be956990f6089d8b1", size = 1302, upload-time = "2013-05-03T01:54:41.513Z" }
 
 [[package]]
 name = "idna"
