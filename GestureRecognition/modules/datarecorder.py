@@ -4,6 +4,10 @@ from pathlib import Path
 from SignalHub import Module
 
 
+class _StopRecording(Exception):
+    pass
+
+
 class DataRecorder(Module):
     """
     SignalHub-Modul zur Aufnahme von Handgesten-Landmarken.
@@ -61,7 +65,7 @@ class DataRecorder(Module):
             key = msvcrt.getch()
             if key == b"\x1b":          # ESC
                 self._finalize()
-                raise SystemExit(0)     # Engine sauber stoppen
+                raise _StopRecording()     # Engine sauber stoppen
 
         return {}
 
