@@ -3,6 +3,7 @@ from collections import deque
 
 class TrailMarker(Module):
     """
+    #test
     Modul zum Zeichnen einer Spur anhand der Bewegung eines Fingers.
 
     Die Position eines bestimmten Finger-Landmarks wird über mehrere Frames
