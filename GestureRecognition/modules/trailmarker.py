@@ -53,6 +53,8 @@ class TrailMarker(Module):
         outputSignal : str, optional
             Name des erzeugten Output-Signals.
         """
+        self.outputSignal = outputSignal
+
         super().__init__(
             inputSignals=["config", "detector"],
             outputSchema={"type": "object", "properties": {outputSignal: {}}},
@@ -101,7 +103,25 @@ class TrailMarker(Module):
         dict
             Ein leeres Dictionary.
         """
+        config = data.get("config", {})
+
+        self.finger_index = get_nested_key(
+            config, "trailmarker.fingerIndex", 8
+        )
+
+        self.max_points = get_nested_key(
+            config, "trailmarker.maxPoints", 50
+        )
+
+        self.max_lost_frames = get_nested_key(
+            config, "trailmarker.maxLostFrames", 10
+        )
+
+        self.trail = deque(maxlen=self.max_points)
+        self.lost_frames = 0
+
         return {}
+
 
     def step(self, data):
         """
@@ -156,7 +176,69 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-        return {}
+         detector = data.get("detector", {})
+        galy = data.get("galy", None)
+
+        hands = detector.get("hands", [])
+
+        if len(hands) == 0:
+            self.lost_frames += 1
+
+            if self.lost_frames > self.max_lost_frames:
+                self.trail.clear()
+
+            return {
+                self.outputSignal: {
+                    "trail": list(self.trail)
+                },
+                "galy": galy
+            }
+
+        self.lost_frames = 0
+
+        hand = hands[0]
+        landmarks = hand.get("landmarks", [])
+
+        if len(landmarks) <= self.finger_index:
+            return {
+                self.outputSignal: {
+                    "trail": list(self.trail)
+                },
+                "galy": galy
+            }
+
+        landmark = landmarks[self.finger_index]
+
+        x = landmark.get("x")
+        y = landmark.get("y")
+
+        if x is None or y is None:
+            return {
+                self.outputSignal: {
+                    "trail": list(self.trail)
+                },
+                "galy": galy
+            }
+
+        point = (x, y)
+        self.trail.append(point)
+
+        if galy is not None:
+            points = list(self.trail)
+
+            for i in range(len(points) - 1):
+                x1, y1 = points[i]
+                x2, y2 = points[i + 1]
+
+                galy.line(x1, y1, x2, y2)
+
+        return {
+            self.outputSignal: {
+                "trail": list(self.trail)
+            },
+            "galy": galy
+        }
+
 
     def stop(self, data):
         """
@@ -178,4 +260,4 @@ class TrailMarker(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        self.trail.clear()
