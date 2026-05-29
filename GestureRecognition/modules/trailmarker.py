@@ -176,7 +176,7 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-         detector = data.get("detector", {})
+        detector = data.get("detector", {})
         galy = data.get("galy", None)
 
         hands = detector.get("hands", [])
