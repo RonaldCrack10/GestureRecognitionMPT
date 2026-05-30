@@ -38,10 +38,12 @@ def data_labeling(times: int, label: str, finger_idx: int = 8):
     """
     save_dir = Path("data") / label
     save_dir.mkdir(parents=True, exist_ok=True)
+    existing = len(list(save_dir.glob("*.npy")))
  
     saved = 0
     while saved < times:
-        save_path = save_dir / f"{label}_{saved + 1:03d}.npy"
+        idx = existing + saved + 1
+        save_path = save_dir / f"{label}_{idx:03d}.npy"
         print(f"\n[{label}]  Aufnahme {saved + 1}/{times}")
         print(f"  Datei: {save_path}")
  
@@ -176,8 +178,8 @@ if __name__ == "__main__":
         )
     else:
         # Normaler Modus
-        GESTEN    = ["A", "B"]  # ← Gesten anpassen
-        AUFNAHMEN = 3           # ← Anzahl Aufnahmen pro Geste
+        GESTEN    = ["B"]  # ← Gesten anpassen
+        AUFNAHMEN = 10           # ← Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:
             data_labeling(times=AUFNAHMEN, label=geste)
