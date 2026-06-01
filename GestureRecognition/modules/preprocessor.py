@@ -1,5 +1,6 @@
 from SignalHub import GALY, get_nested_key, Module
 from collections import deque
+import numpy as np
 
 class Preprocessor(Module):
     """
@@ -57,9 +58,12 @@ class Preprocessor(Module):
         outputSignal : str, optional
             Name des erzeugten Output-Signals.
         """
+        self.outputSignal = outputSignal
+
         super().__init__(
             inputSignals=["config", "detector"],
-            outputSchema={"type": "object", "properties": {outputSignal: {}}},
+            outputSchema={"type": "object",
+                          "properties": {outputSignal: {}}},
             name="preprocessor",
         )
 
@@ -104,8 +108,18 @@ class Preprocessor(Module):
         dict
             Ein leeres Dictionary.
         """
-        return {}
+        config = data["config"]
 
+        self.finger_index = get_nested_key(config,["preprocessor", "finger_index"],8)
+        self.max_points = get_nested_key(config,["preprocessor", "max_points"],30)
+        self.min_points = get_nested_key(config,["preprocessor", "min_points"],10)
+        self.max_lost_frames = get_nested_key(config,["preprocessor", "max_lost_frames"],5)
+        self.trajectory = deque(maxlen=self.max_points)
+        self.lost_frames = 0
+
+        return {}
+      
+      
     def step(self, data):
         """
         Verarbeitung eines einzelnen Frames.
@@ -164,7 +178,53 @@ class Preprocessor(Module):
 
             ``return {outputSignal: trajectory}``
         """
-        return {}
+        detector = data.get("detector")
+
+        # keine Hand erkannt
+        if detector is None or len(detector) == 0:
+            self.lost_frames += 1
+
+            if self.lost_frames > self.max_lost_frames:
+                self.trajectory.clear()
+
+            return {self.outputSignal: None}
+
+        self.lost_frames = 0
+
+        try:
+            # erste erkannte Hand
+            hand = detector[0]
+
+            # Fingerlandmarke anhand des konfigurierten Indexes
+            landmark = hand[self.finger_index]
+
+            x = landmark.x
+            y = landmark.y
+
+            self.trajectory.append([x, y])
+
+        except Exception:
+            return {self.outputSignal: None}
+
+        # noch nicht genug Punkte gesammelt
+        if len(self.trajectory) < self.min_points:
+            return {self.outputSignal: None}
+
+        trajectory = np.array(self.trajectory, dtype=np.float32)
+
+        # Zentrum berechnen
+        center = np.mean(trajectory, axis=0)
+
+        # Zentrieren
+        trajectory = trajectory - center
+
+        # Skalieren
+        max_dist = np.max(np.linalg.norm(trajectory, axis=1))
+
+        if max_dist > 0:
+            trajectory = trajectory / max_dist
+
+        return {self.outputSignal: trajectory}
 
     def stop(self, data):
         """
@@ -186,4 +246,5 @@ class Preprocessor(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        self.trajectory.clear()
+        self.lost_frames = 0
