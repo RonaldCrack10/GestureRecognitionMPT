@@ -66,7 +66,7 @@ class Preprocessor(Module):
                           "properties": {outputSignal: {}}},
             name="preprocessor",
         )
-
+  #start zieht sich aus der config alle einstellunge
     def start(self, data):
         """
         Initialisierung des Modulzustands.
@@ -109,7 +109,7 @@ class Preprocessor(Module):
             Ein leeres Dictionary.
         """
         config = data["config"]
-
+        # Lese Parameter aus data
         self.finger_index = get_nested_key(config,["preprocessor", "finger_index"],8)
         self.max_points = get_nested_key(config,["preprocessor", "max_points"],30)
         self.min_points = get_nested_key(config,["preprocessor", "min_points"],10)
@@ -119,7 +119,7 @@ class Preprocessor(Module):
 
         return {}
       
-      
+      #iteriert über die frames und verarbeitet sie, um die Trajektorie zu erstellen
     def step(self, data):
         """
         Verarbeitung eines einzelnen Frames.
@@ -209,16 +209,16 @@ class Preprocessor(Module):
         # noch nicht genug Punkte gesammelt
         if len(self.trajectory) < self.min_points:
             return {self.outputSignal: None}
-
+        #numpy aaray wird erstellt und in komma zahlen umgewandelt, damit sie später einfacher verarbeitet werden können  
         trajectory = np.array(self.trajectory, dtype=np.float32)
 
-        # Zentrum berechnen
+        # mittelpunkt von allen xx und y werten berechnen
         center = np.mean(trajectory, axis=0)
 
-        # Zentrieren
+        # Zentrierenvon jedem punkt dem den mittelpunkt abziehen damit die Trajektorie um den Ursprung zentriert ist
         trajectory = trajectory - center
 
-        # Skalieren
+        # Skalieren damit koordinaten werte vergleichbarer sind
         max_dist = np.max(np.linalg.norm(trajectory, axis=1))
 
         if max_dist > 0:
