@@ -110,10 +110,10 @@ class Preprocessor(Module):
         """
         config = data["config"]
         # Lese Parameter aus data
-        self.finger_index = get_nested_key(config,["preprocessor", "finger_index"],8)
-        self.max_points = get_nested_key(config,["preprocessor", "max_points"],30)
-        self.min_points = get_nested_key(config,["preprocessor", "min_points"],10)
-        self.max_lost_frames = get_nested_key(config,["preprocessor", "max_lost_frames"],5)
+        self.finger_index = get_nested_key("preprocessor.finger_idx",data,default=8)
+        self.max_points = get_nested_key("preprocessor.buffer_size",data,default=140)
+        self.min_points = get_nested_key("preprocessor.min_steps",data,default=15)
+        self.max_lost_frames = get_nested_key("preprocessor.max_lost",data,default=10)
         self.trajectory = deque(maxlen=self.max_points)
         self.lost_frames = 0
 
@@ -180,22 +180,18 @@ class Preprocessor(Module):
         """
         detector = data.get("detector")
 
-        # keine Hand erkannt
-        if detector is None or len(detector) == 0:
+        if detector is None or not detector.hand_landmarks:
             self.lost_frames += 1
 
-            if self.lost_frames > self.max_lost_frames:
-                self.trajectory.clear()
+        if self.lost_frames > self.max_lost_frames:
+            self.trajectory.clear()
 
             return {self.outputSignal: None}
 
         self.lost_frames = 0
 
         try:
-            # erste erkannte Hand
-            hand = detector[0]
-
-            # Fingerlandmarke anhand des konfigurierten Indexes
+            hand = detector.hand_landmarks[0]
             landmark = hand[self.finger_index]
 
             x = landmark.x
@@ -206,19 +202,14 @@ class Preprocessor(Module):
         except Exception:
             return {self.outputSignal: None}
 
-        # noch nicht genug Punkte gesammelt
         if len(self.trajectory) < self.min_points:
             return {self.outputSignal: None}
-        #numpy aaray wird erstellt und in komma zahlen umgewandelt, damit sie später einfacher verarbeitet werden können  
+
         trajectory = np.array(self.trajectory, dtype=np.float32)
 
-        # mittelpunkt von allen xx und y werten berechnen
         center = np.mean(trajectory, axis=0)
-
-        # Zentrierenvon jedem punkt dem den mittelpunkt abziehen damit die Trajektorie um den Ursprung zentriert ist
         trajectory = trajectory - center
 
-        # Skalieren damit koordinaten werte vergleichbarer sind
         max_dist = np.max(np.linalg.norm(trajectory, axis=1))
 
         if max_dist > 0:
