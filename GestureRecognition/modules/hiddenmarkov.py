@@ -62,13 +62,13 @@ class HMMModule(Module):
             color     = bgr("#AD0303"),
         )
 
-        for i, (label, score) in enumerate(self.last_result["scores"].items()):
-            galy.putText(
-                f"{label}: {score:.2f}",
-                (int(width * 0.05), int(height * 0.1) + 40 + i * 30),
-                fontScale = 0.8,
-                color     = bgr("#FFFFFF"),
-            )
+        # for i, (label, score) in enumerate(self.last_result["scores"].items()):
+        #     galy.putText(
+        #         f"{label}: {score:.2f}",
+        #         (int(width * 0.05), int(height * 0.1) + 40 + i * 30),
+        #         fontScale = 0.8,
+        #         color     = bgr("#FFFFFF"),
+        #     )
 
         return {self.outputSignal: self.last_result, "galy": galy}
 
