@@ -4,12 +4,14 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
+
 from SignalHub import GALY, bgr, get_nested_key, Module
 
 mp_hand = mp.tasks.vision.HandLandmarksConnections
 
 
 def draw_hand_landmarks(hand_landmarks, galy: GALY):
+    height, width = 720, 1280
     lm = {
         "thumb":         {"color": bgr("#0000FF")},
         "index_finger":  {"color": bgr("#00FF00")},
@@ -18,23 +20,35 @@ def draw_hand_landmarks(hand_landmarks, galy: GALY):
         "pinky_finger":  {"color": bgr("#FF00FF")},
         "palm":          {"color": bgr("#C8C8C8")},
     }
+    connections = {
+        "thumb":         [(0,1), (1,2), (2,3), (3,4)],
+        "index_finger":  [(0,5), (5,6), (6,7), (7,8)],
+        "middle_finger": [(9,10), (10,11), (11,12)],
+        "ring_finger":   [(13,14), (14,15), (15,16)],
+        "pinky_finger":  [(17,18), (18,19), (19,20)],
+        "palm":          [(0,17), (5,9), (9,13), (13,17)]
+    }
     x = np.inf
     y = np.inf
     for key in lm.keys():
         pts = set()
         for conn in getattr(mp_hand, f"HAND_{key.upper()}_CONNECTIONS"):
-            start = (hand_landmarks[conn.start].x,
-                    hand_landmarks[conn.start].y)
-            end = (hand_landmarks[conn.end].x,
-                hand_landmarks[conn.end].y)
-            x = min(x, start[0], end[0])
-            y = min(y, start[1], end[1])
-            galy.line(start, end, lm[key]["color"], 2)
+            # 2. Koordinaten auf Pixel skalieren
+            start_px = (int(hand_landmarks[conn.start].x * width),
+                        int(hand_landmarks[conn.start].y * height))
+            end_px = (int(hand_landmarks[conn.end].x * width),
+                      int(hand_landmarks[conn.end].y * height))
+            
+            # Zeichnen der Verbindungslinien
+            galy.line(start_px, end_px, lm[key]["color"], 2)
             pts.update([conn.start, conn.end])
+            
+        # Zeichnen der Punkte
         for pt in pts:
-            galy.circle((hand_landmarks[pt].x, hand_landmarks[pt].y), 5, (255,255,255), 1)
-            galy.circle((hand_landmarks[pt].x, hand_landmarks[pt].y), 4, lm[key]["color"], -1)
-
+            pt_px = (int(hand_landmarks[pt].x * width),
+                     int(hand_landmarks[pt].y * height))
+            galy.circle(pt_px, 5, (255, 255, 255), 1)
+            galy.circle(pt_px, 4, lm[key]["color"], -1)
 
 class HandDetector(Module):
     """
@@ -93,12 +107,22 @@ class HandDetector(Module):
         outputSignal : str, optional
             Name des erzeugten Output-Signals.
         """
+        self.outputSignal = outputSignal
+
         super().__init__(
-            inputSignals=["config", "webcam"],
-            outputSchema={"type": "object", "properties": {outputSignal: {}}},
-            name="detector",
+            name = 'HandDetector',
+            inputSignals = ['config', 'webcam'],
+            outputSchema = {
+                'type' : 'object',
+                'properties': {
+                    outputSignal : {}
+
+                }
+            }
+
         )
 
+        
     def start(self, data):
         """
         Initialisierung des Moduls.
@@ -129,7 +153,22 @@ class HandDetector(Module):
         -------
         dict
             Ein leeres Dictionary.
+            
         """
+        # mp_hands = mp.solutions.hands
+        model_path = get_nested_key('config.hand_model_path', data,  default = 'hand_landmarker.task') # get_nested_key dient dazu sicher den schlüssel(key) in verschachtelten dictionary zu erhalten
+        base_options = mp.tasks.BaseOptions(model_asset_path = model_path)
+        options = vision.HandLandmarkerOptions(base_options = base_options, 
+                                               num_hands = 1)
+        # self.detector = mp_hands.Hands(
+        #     static_image_mode=False,
+        #     max_num_hands=1,
+        #     min_detection_confidence=0.75,  # Weniger wackeln, strenger suchen
+        #     min_tracking_confidence=0.75,   # Hand stabilisieren
+        #     model_complexity=1              # Nutzt genaueres Modell
+        # )
+        self.detector = vision.HandLandmarker.create_from_options(options)        
+    
         return {}
 
     def step(self, data):
@@ -184,7 +223,23 @@ class HandDetector(Module):
 
             ``return {outputSignal: result, "galy": galy}``
         """
-        return {}
+        
+
+        frame = get_nested_key('webcam', data) # receive frame from webcam signal 
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # convert the color canal from bgr to rgb
+        mp_image = mp.Image(image_format = mp.ImageFormat.SRGB, data = rgb_frame) # converting each frame in the correct image format as mediapipe wants
+
+        results = self.detector.detect(mp_image) # detection of landmarks
+
+        # landmarks visualisieren
+        galy = GALY()
+        # galy.blit("webcam", (0, 0))
+        galy.layer("landmarks") 
+        if results.hand_landmarks:
+            for hand_landmarks in results.hand_landmarks:
+                draw_hand_landmarks(hand_landmarks, galy)
+
+        return {self.outputSignal: results, "galy": galy}
 
     def stop(self, data):
         """
@@ -206,4 +261,5 @@ class HandDetector(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        self.detector.close()
+        
