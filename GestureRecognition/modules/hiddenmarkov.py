@@ -1,194 +1,77 @@
+import numpy as np
 from SignalHub import GALY, bgr, get_nested_key, Module
+from GestureRecognition.hmmclassifier import HMMClassifier
 
 
 class HMMModule(Module):
     """
     Modul zur Klassifikation von Gesten mittels Hidden Markov Models.
 
-    Dieses Modul erhält eine vorverarbeitete Fingertrajektorie vom
-    :class:`Preprocessor` Modul und verwendet ein trainiertes
-    Hidden-Markov-Modell, um eine Geste zu klassifizieren.
-
-    Ziel ist es, eine geladene Modellstruktur zu verwenden, um
-    eine Entscheidung über die aktuell ausgeführte Bewegung zu treffen
-    und das Ergebnis an das Framework zurückzugeben.
+    Empfängt eine vorverarbeitete Fingertrajektorie vom Preprocessor,
+    klassifiziert sie mit einem trainierten HMMClassifier und
+    visualisiert das Ergebnis.
     """
 
-    def __init__(self, outputSignal="markov", model_path="data/hmm.pkl", **kwargs):
-        """
-        Konstruktor des Moduls.
+    def __init__(self, outputSignal="markov", model_path="data/hmm_model.pickle", **kwargs):
+        self.outputSignal = outputSignal
+        self.model_path   = model_path
 
-        Ziel ist es, das Modul beim Framework korrekt zu registrieren.
-
-        Hinweise
-        --------
-        - Ein Modul muss definieren, **welche Signale es empfangen möchte**.
-        - Diese werden über ``inputSignals`` angegeben.
-        - Nur Signale, die hier subscribed werden, erscheinen später im
-          ``data`` Dictionary der Methoden :meth:`start` und :meth:`step`.
-
-        Für dieses Modul werden unter anderem folgende Signale benötigt:
-
-        - ``config`` : Systemkonfiguration
-        - ``preprocessor`` : normalisierte Trajektorien
-
-        Zusätzlich muss ein **Output-Schema** definiert werden.
-
-        Output Schema
-        -------------
-        Das Modul erzeugt ein Signal mit dem Namen ``markov``.
-
-        Dieses Signal enthält Informationen über die erkannte Geste
-        sowie deren Klassifikationsscore.
-
-        Beispiel:
-
-        ``outputSchema={"type": "object", "properties": {outputSignal: {}}}``
-
-        .. note::
-           Die Basisklasse :class:`Module` erwartet beim Aufruf von
-           ``super().__init__`` unter anderem:
-
-           - ``inputSignals``
-           - ``outputSchema``
-           - ``name`` des Moduls
-
-        Parameters
-        ----------
-        outputSignal : str, optional
-            Name des erzeugten Output-Signals.
-
-        model_path : str, optional
-            Pfad zu einem gespeicherten HMM-Modell.
-
-        **kwargs
-            Weitere Parameter, die an :class:`Module` weitergegeben werden.
-        """
         super().__init__(
-            inputSignals=["config", "preprocessor"],
-            outputSchema={"type": "object", "properties": {outputSignal: {}}},
-            name="hiddenmarkov",
+            name         = "hiddenmarkov",
+            inputSignals = ["config", "preprocessor"],
+            outputSchema = {"type": "object", "properties": {outputSignal: {}}},
         )
 
-    def start(self, data):
-        """
-        Initialisierung des Moduls.
-
-        Diese Methode wird einmal beim Start des Moduls ausgeführt.
-
-        Ziel ist es, ein zuvor trainiertes Hidden-Markov-Modell zu laden,
-        das später zur Klassifikation verwendet wird.
-
-        Hinweise
-        --------
-        - Das Modell kann aus einer Datei geladen werden.
-        - Typischerweise wird dafür eine Klassenmethode verwendet,
-          die ein gespeichertes Modell rekonstruiert.
-        - Das geladene Modell sollte als Attribut des Moduls gespeichert
-          werden, damit es in :meth:`step` verwendet werden kann.
-
-        .. tip::
-           Trenne klar zwischen:
-            - Modell laden (``start``)
-            - Modell anwenden (``step``)
-
-        .. warning::
-           Stelle sicher, dass:
-            - der Pfad korrekt ist
-            - das Modell zum erwarteten Datenformat passt
-
-        Parameters
-        ----------
-        data : dict
-            Eingabedaten des Frameworks.
-
-        Returns
-        -------
-        dict
-            Ein leeres Dictionary.
-        """
+    def start(self, data: dict) -> dict:
+        model_path  = get_nested_key('config.hmm_model_path', data, default=self.model_path)
+        self.model  = HMMClassifier.load(model_path)
+        self.last_result = None 
         return {}
 
-    def step(self, data):
-        """
-        Verarbeitung eines einzelnen Frames.
+    def step(self, data: dict) -> dict:
+        trajectory = get_nested_key('preprocessor', data)
 
-        Ziel ist es, eine vorverarbeitete Trajektorie zu klassifizieren
-        und die wahrscheinlichste Geste zu bestimmen.
+        if trajectory is not None and len(trajectory) > 0:
+            
+            seq        = np.array(trajectory, dtype=np.float32)
+            best_label = self.model.predict_single(seq)
+            scores_arr = self.model.decision_function(seq, [len(seq)])[0]
+            best_score = float(np.max(scores_arr))
 
-        Hinweise
-        --------
-        - Greife auf das ``preprocessor`` Signal zu.
-        - Falls keine Trajektorie vorhanden ist, kann die Verarbeitung
-          übersprungen werden.
-        - Das geladene HMM-Modell kann anschließend verwendet werden,
-          um eine Entscheidung für die aktuelle Bewegung zu berechnen.
-        - Das Ergebnis enthält typischerweise Scores für mehrere Klassen.
-        - Die Klasse mit dem höchsten Score kann als Ergebnis gewählt werden.
+            self.last_result = {
+                "label":  best_label,
+                "score":  best_score,
+                "scores": dict(zip(self.model.classes_, scores_arr)),
+            }
 
-        Zusätzlich kann eine Visualisierung erzeugt werden:
+        # Nichts zu zeigen
+        if self.last_result is None:
+            return {}
 
-        - Erzeuge ein :class:`GALY` Objekt.
-        - Lege eine neue Zeichenebene an.
-        - Verwende :meth:`putText`, um Score und Label darzustellen.
-        - Für die Skalierung der Zeichenebene können Parameter aus der
-          Konfiguration über :meth:`get_nested_key` gelesen werden.
+        # Letztes Ergebnis weiter anzeigen
+        width  = get_nested_key('config.width',  data, default=1280)
+        height = get_nested_key('config.height', data, default=720)
 
-        .. tip::
-           Typischer Ablauf:
-            1. Daten prüfen (existiert eine Sequenz?)
-            2. Modell anwenden
-            3. Scores interpretieren
-            4. Ergebnis visualisieren
+        galy = GALY()
+        galy.layer("hmm")
 
-        .. note::
-           Du entscheidest selbst:
-            - wie du Scores darstellst
-            - ob du nur das beste Label oder mehrere Kandidaten zeigst
+        galy.putText(
+            f"{self.last_result['label']}  {self.last_result['score']:.2f}",
+            (int(width * 0.05), int(height * 0.1)),
+            fontScale = 1.5,
+            color     = bgr("#AD0303"),
+        )
 
-        .. warning::
-           Achte darauf, dass:
-            - das Eingabeformat exakt zum Trainingsformat passt
-            - keine leeren oder fehlerhaften Sequenzen verarbeitet werden
+        # for i, (label, score) in enumerate(self.last_result["scores"].items()):
+        #     galy.putText(
+        #         f"{label}: {score:.2f}",
+        #         (int(width * 0.05), int(height * 0.1) + 40 + i * 30),
+        #         fontScale = 0.8,
+        #         color     = bgr("#FFFFFF"),
+        #     )
 
-        Parameters
-        ----------
-        data : dict
-            Enthält unter anderem:
+        return {self.outputSignal: self.last_result, "galy": galy}
 
-            - ``preprocessor`` : normalisierte Trajektorie
-            - ``config`` : Systemkonfiguration
-
-        Returns
-        -------
-        dict
-            Soll die erkannte Geste sowie optional Visualisierungsdaten
-            enthalten.
-
-            Beispiel:
-
-            ``return {outputSignal: result, "galy": galy}``
-        """
-        return {}
-
-    def stop(self, data):
-        """
-        Wird aufgerufen, wenn das Modul beendet wird.
-
-        Ziel ist es, bei Bedarf interne Zustände zurückzusetzen
-        oder Ressourcen freizugeben.
-
-        Hinweise
-        --------
-        - In vielen Fällen ist keine spezielle Bereinigung notwendig.
-
-        .. note::
-           Diese Methode ist optional, kann aber relevant werden,
-           wenn Modelle oder externe Ressourcen verwaltet werden.
-
-        Parameters
-        ----------
-        data : dict
-            Letzte übergebene Daten des Frameworks.
-        """
+    
+    def stop(self, data: dict) -> None:
         pass
