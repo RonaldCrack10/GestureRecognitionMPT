@@ -3,6 +3,7 @@ from collections import deque
 
 class TrailMarker(Module):
     """
+    #test
     Modul zum Zeichnen einer Spur anhand der Bewegung eines Fingers.
 
     Die Position eines bestimmten Finger-Landmarks wird über mehrere Frames
@@ -52,6 +53,8 @@ class TrailMarker(Module):
         outputSignal : str, optional
             Name des erzeugten Output-Signals.
         """
+        self.outputSignal = outputSignal
+
         super().__init__(
             inputSignals=["config", "detector"],
             outputSchema={"type": "object", "properties": {outputSignal: {}}},
@@ -100,7 +103,31 @@ class TrailMarker(Module):
         dict
             Ein leeres Dictionary.
         """
+
+        # lese die config datei ein
+        config = data.get("config", {})
+
+        # bestimme den zu verfolgenen finger index
+        self.finger_index = get_nested_key(
+            config, "trailmarker.fingerIndex", 8
+        )
+
+        #bestimme wie lange der FInger verfolgt werden soll
+        self.max_points = get_nested_key(
+            config, "trailmarker.maxPoints", 50
+        )
+
+        #bestimme wie viele frames ohne erkannten Finger erlaubt sind, bevor die Spur gelöscht wird
+        self.max_lost_frames = get_nested_key(
+            config, "trailmarker.maxLostFrames", 10
+        )
+
+        # erstelle die trajektorie
+        self.trail = deque(maxlen=self.max_points)
+        self.lost_frames = 0
+
         return {}
+
 
     def step(self, data):
         """
@@ -155,7 +182,86 @@ class TrailMarker(Module):
 
             ``return { ..., "galy": galy}``
         """
-        return {}
+        detector = data.get("detector", {})
+        galy = data.get("galy", None)
+
+        hands = detector.get("hands", [])
+
+        # Nur True wenn keine Hand erkannt wurde, sonst False
+        if len(hands) == 0:
+            self.lost_frames += 1
+
+            #Nur True wenn über 10 Frames keine Hand erkannt wurde, sonst False
+            if self.lost_frames > self.max_lost_frames:
+                self.trail.clear()
+
+            return {
+                self.outputSignal: {
+                    "trail": list(self.trail)
+                },
+                "galy": galy
+            }
+
+        #----------------------------------------------------------------------
+        # Code ist nur hier wenn eine Hand erkannt wurde
+        #----------------------------------------------------------------------
+
+        # setze lost_frames zurück, da eine Hand erkannt wurde
+        self.lost_frames = 0
+
+        # Nimm die erste erkannte Hand (falls mehrere erkannt wurden)
+        hand = hands[0]
+
+        # Speichere die Landmarks der Hand
+        landmarks = hand.get("landmarks", [])
+
+        # Breche ab, wenn die Anzahl der Landmarks nicht ausreicht
+        if len(landmarks) <= self.finger_index:
+            return {
+                self.outputSignal: {
+                    "trail": list(self.trail)
+                },
+                "galy": galy
+            }
+
+        # Wähle welcher Finger verfolgt werden soll
+        landmark = landmarks[self.finger_index]
+
+        #zwischenspeichere die x und y Koordinaten des Fingers
+        x = landmark.get("x")
+        y = landmark.get("y")
+
+        # Breche ab falls nicht beide Koordinaten vorhanden sind
+        if x is None or y is None:
+            return {
+                self.outputSignal: {
+                    "trail": list(self.trail)
+                },
+                "galy": galy
+            }
+
+        # erstelle ein Tupel mit den x,y Koordinaten
+        point = (x, y)
+
+        # Füge das Tupel der trajektorie hinzu
+        self.trail.append(point)
+
+        if galy is not None:
+            points = list(self.trail)
+
+            for i in range(len(points) - 1):
+                x1, y1 = points[i]
+                x2, y2 = points[i + 1]
+
+                galy.line(x1, y1, x2, y2)
+
+        return {
+            self.outputSignal: {
+                "trail": list(self.trail)
+            },
+            "galy": galy
+        }
+
 
     def stop(self, data):
         """
@@ -177,4 +283,4 @@ class TrailMarker(Module):
         data : dict
             Letzte übergebene Daten des Frameworks.
         """
-        pass
+        self.trail.clear()
