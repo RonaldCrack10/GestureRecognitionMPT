@@ -1,6 +1,5 @@
 import pickle
 import numpy as np
-# Ersetze den Pfad mit einer eurer heruntergeladenen .pkl Dateien
 dateipfad = r"C:\Users\Evran\GestureRecognitionMPT\recordings\A\A-1773050612.172112.pkl"
 
 with open(dateipfad, "rb") as f:
@@ -17,9 +16,14 @@ preprocessor_filled_frames = [
     x for x in preprocessor_frames
     if x is not None and x.get("preprocessor") is not None
 ]
+preprocessor_sequence_lengths= [len(x) for x in preprocessor_filled_frames]
 #print(preprocessor_frames_type)
-print(f" preprocessor frames ({len(preprocessor_frames)}):", preprocessor_frames)
-#print(f"Preprocessor filled Frames ({len(preprocessor_filled_frames)}):", preprocessor_filled_frames)
-
-#hidden_markov_data= replay_daten.get("hiddenmarkov")
+#print(f" preprocessor frames ({len(preprocessor_frames)}):", preprocessor_frames)
+print(f"Preprocessor filled Frames ({len(preprocessor_filled_frames)}):", preprocessor_filled_frames)
+#print(preprocessor_sequence_lengths)
+hidden_markov_data= replay_daten.get("hiddenmarkov")
 #print(hidden_markov_data)
+
+hand_detector= replay_daten.get("detector")
+trailmaker= replay_daten.get("trailmaker")
+#print((hand_detector))

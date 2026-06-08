@@ -1,9 +1,11 @@
 import pickle
-from cProfile import label
-
-import matplotlib.pyplot as plt
 import os
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from fontTools.misc.classifyTools import Classifier
+from sklearn.metrics import accuracy_score, confusion_matrix
+from hmmclassifier import HMMClassifier
 
 def visualize_dataset(label_pfad, label_name):
     """
@@ -113,13 +115,11 @@ def visualize_dataset(label_pfad, label_name):
     plt.show()
 
 #Test mit Buchstabe O
-if __name__ == "__main__":
-    test_ordner_O = r"C:\Users\Evran\GestureRecognitionMPT\recordings\O"
-    visualize_dataset(test_ordner_O, "Buchstabe O")
+#if __name__ == "__main__":
+    #test_ordner_O = r"C:\Users\Evran\GestureRecognitionMPT\recordings\O"
+    #visualize_dataset(test_ordner_O, "Buchstabe O")
 
-
-
-def evaluate_classifier():
+def evaluate_classifier(model_path, test_data_path):
     """
     TODO: Evaluation deines Klassifikators
 
@@ -170,7 +170,63 @@ def evaluate_classifier():
     - Weitere Metriken (Precision, Recall, F1)
     - Vergleich verschiedener Modelle
     """
-    pass
+    print("Starts evaluation...")
+    print(f"lade modell aus {model_path}")
+    print(f"lade Test daten aus {test_data_path}")
+
+    classifier = HMMClassifier()
+    try:
+        classifier.load_model(model_path)
+        classifier.load_test_data(test_data_path)
+    except FileNotFoundError:
+        print("Fehler: Konnte Modell oder Testdaten nicht finden.")
+        return
+
+    if not classifier.test_data:
+        print("Fehler: Keine Testdaten geladen!")
+        return
+
+    y_true = []
+    y_pred = []
+
+    print("Predictions start....")
+
+    for true_label, sequences_list in classifier.test_data.items():
+        if not sequences_list:
+            continue
+
+        predictions = classifier.predict(sequences_list)
+        y_true.extend([true_label] * len(sequences_list))
+        y_pred.extend(predictions)
+
+    # Metriken
+    genauigkeit= accuracy_score(y_true, y_pred)
+    print(f"Klassifikationsgenauigkeit (Accuracy): {genauigkeit:.2%} ({genauigkeit * 100:.1f}%)")
+
+    # 5. Confusion Matrix zeichnen
+    alle_klassen = sorted(list(set(y_true + y_pred)))
+    matrix = confusion_matrix(y_true, y_pred, labels=alle_klassen)
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(matrix, annot=True, fmt='d', cmap='Blues',
+                xticklabels=alle_klassen, yticklabels=alle_klassen)
+
+    plt.title(f'Confusion Matrix\n(Genauigkeit: {genauigkeit:.2%})', fontsize=16)
+    plt.ylabel('Wahre Geste', fontsize=12)
+    plt.xlabel('Vorausgesagte Geste', fontsize=12)
+
+    plt.xticks(rotation=45)
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    mein_modell = "trained_models/hmm_models.pkl"
+    meine_testdaten = "test_data/test_data.pkl"
+
+    evaluate_classifier(mein_modell, meine_testdaten)
+
 
 def replay_recordings():
     """

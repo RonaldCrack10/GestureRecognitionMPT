@@ -70,20 +70,32 @@ class HMMClassifier:
         # Speicher für Testdaten zur späteren Evaluation
         self.test_data = {}
 
-    def save_model(self, filepath="data/hmm_models.pkl"):
+    def save_model(self, filepath="trained_models/hmm_models.pkl"):
         """Speichert die trainierten Modelle und Klassen."""
+       # filepath = os.path.join("trained_models","hmm_models.pkl")
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, "wb") as f:
             pickle.dump({"models": self.models, "classes": self.classes_}, f)
 
         print(f"Modell erfolgreich gespeichert unter: {filepath}")
 
-    def load_model(self, filepath="data/hmm_models.pkl"):
+    def load_model(self, filepath="trained_models/hmm_models.pkl"):
         """Lädt trainierte Modelle aus einer Pickle-Datei."""
         with open(filepath, "rb") as f:
             data = pickle.load(f)
             self.models = data["models"]
             self.classes_ = data["classes"]
+        return self
+
+    def save_test_data(self, filepath="test_data/test_data.pkl"):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, "wb") as f:
+            pickle.dump(self.test_data, f)
+        print(f"Testdaten erfolgreich gespeichert unter: {filepath}")
+
+    def load_test_data(self, filepath="test_data/test_data.pkl"):
+        with open(filepath, "rb") as f:
+            self.test_data = pickle.load(f)
         return self
 
     def _extract_sequences_from_folder(self, ordner_pfad):
@@ -110,6 +122,8 @@ class HMMClassifier:
 
             # Längste Sequenz finden
             for frame_dict in recording['preprocessor']:
+                if frame_dict is None:
+                    continue
                 daten = frame_dict.get('preprocessor')
                 if daten is not None and len(daten) > max_laenge:
                     max_laenge = len(daten)
@@ -197,8 +211,8 @@ class HMMClassifier:
 
             # Trainiertes Modell im Dictionary ablegen
             self.models[label] = model
-            print("Training abgeschlossen!")
-            return self
+            print(f"Training abgeschlossen für Klasse {label}!")
+        return self
 
     def decision_function(self,sequences):
         """
@@ -258,7 +272,7 @@ class HMMClassifier:
             all_scores.append(seq_scores)
 
             # Gib ein Array der Form (n_sequences, n_classes) zurück
-            return np.array(all_scores)
+        return np.array(all_scores)
 
     def predict(self, sequences):
         """
@@ -303,9 +317,9 @@ class HMMClassifier:
 
         return predictions
 
-
-#if __name__ == "__main__":
-    #daten_pfad = r"C:\Users\Evran\GestureRecognitionMPT\recordings"
-    #classifier = HMMClassifier(n_components=5)
-    #classifier.fit(data_directory=daten_pfad)
-    #classifier.save_model("data/mein_gehirn.pkl")
+if __name__ == "__main__":
+    daten_pfad = r"C:\Users\Evran\GestureRecognitionMPT\recordings"
+    classifier = HMMClassifier(n_components=5)
+    classifier.fit(data_directory=daten_pfad)
+    classifier.save_model("trained_models/hmm_models.pkl")
+    classifier.save_test_data("test_data/test_data.pkl")
