@@ -32,23 +32,27 @@ class HMMModule(Module):
         trajectory = get_nested_key('preprocessor', data)
 
         if trajectory is not None and len(trajectory) > 0:
-            
-            seq        = np.array(trajectory, dtype=np.float32)
-            best_label = self.model.predict_single(seq)
+            # Preprocessor already normalizes, use data as-is
+            seq = np.array(trajectory, dtype=np.float32)
+
             scores_arr = self.model.decision_function(seq, [len(seq)])[0]
+            best_label = self.model.predict_single(seq)
             best_score = float(np.max(scores_arr))
+
+            print(f"seq shape:  {seq.shape}")
+            print(f"seq min:    {seq.min():.4f}")
+            print(f"seq max:    {seq.max():.4f}")
+            print(f"seq mean:   {seq.mean():.4f}")
+            print(f"scores:     {dict(zip(self.model.classes_, scores_arr))}")
 
             self.last_result = {
                 "label":  best_label,
                 "score":  best_score,
                 "scores": dict(zip(self.model.classes_, scores_arr)),
             }
-
-        # Nichts zu zeigen
         if self.last_result is None:
             return {}
 
-        # Letztes Ergebnis weiter anzeigen
         width  = get_nested_key('config.width',  data, default=1280)
         height = get_nested_key('config.height', data, default=720)
 
@@ -59,17 +63,9 @@ class HMMModule(Module):
             f"{self.last_result['label']}  {self.last_result['score']:.2f}",
             (int(width * 0.05), int(height * 0.1)),
             fontScale = 1.5,
-            color     = bgr("#AD0303"),
+            color     = bgr("#FC0000"),
         )
-
-        # for i, (label, score) in enumerate(self.last_result["scores"].items()):
-        #     galy.putText(
-        #         f"{label}: {score:.2f}",
-        #         (int(width * 0.05), int(height * 0.1) + 40 + i * 30),
-        #         fontScale = 0.8,
-        #         color     = bgr("#FFFFFF"),
-        #     )
-
+        
         return {self.outputSignal: self.last_result, "galy": galy}
 
     
