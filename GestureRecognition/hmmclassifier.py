@@ -69,7 +69,7 @@ class HMMClassifier:
                 continue
 
             # Train / Test Split
-            perm    = rng.permutation(n)
+            perm    = rng.permutation(n) # permutation der Indizes für zufällige Aufteilung des Datensatzes
             n_test  = max(1, int(n * self.test_size))
             n_train = n - n_test
 
@@ -84,6 +84,8 @@ class HMMClassifier:
                 covariance_type = "diag",
                 n_iter          = self.n_iter,
                 random_state    = self.random_state,
+
+                min_covar=1e-2  # Verhindert zu kleine Varianzen, die zu Singularitäten führen können
             )
             model.fit(X_train, lens_train)
             self.models_[label] = model
@@ -101,7 +103,7 @@ class HMMClassifier:
         return self
 
 
-    def decision_function(self, X: np.ndarray, lengths: list) -> np.ndarray:
+    def decision_function(self, X: np.ndarray, lengths: list) -> np.ndarray: # -> shape (n_sequences, n_classes)
         """
         Berechnet Log-Likelihood jeder Sequenz unter jedem Klassenmodell.
 
@@ -116,7 +118,7 @@ class HMMClassifier:
         """
         n_seq  = len(lengths)
         n_cls  = len(self.classes_)
-        scores = np.full((n_seq, n_cls), -np.inf)
+        scores = np.full((n_seq, n_cls), -np.inf) # till infinity because log-likelihoods can be very negative and we want to avoid numerical issues
 
         for j, label in enumerate(self.classes_):
             model = self.models_.get(label)
@@ -127,13 +129,22 @@ class HMMClassifier:
             for i, length in enumerate(lengths):
                 seq = X[idx : idx + length]
                 try:
-                    scores[i, j] = model.score(seq)
+                    scores[i, j] = model.score(seq) / length  # Normalize by sequence length
                 except Exception:
                     scores[i, j] = -np.inf
                 idx += length
 
         return scores
+    '''
+    decision_function funktioniert so dass sie für jede Sequenz (Zeile) 
+    die Log-Likelihood unter jedem Klassenmodell (Spalte) berechnet. 
+    Das Ergebnis ist eine 2D-Array, in der der höchste Wert in jeder Zeile angibt, welches Modell 
+    die Sequenz am besten erklärt.
 
+    log-likelihoods wird angewendet, weil die Wahrscheinlichkeit von Sequenzen unter HMMs oft sehr 
+    klein ist, und die Logarithmierung hilft, mit diesen kleinen Zahlen umzugehen und 
+    numerische Stabilität zu gewährleisten.
+    '''
     def predict(self, X: np.ndarray, lengths: list) -> list:
         """
         Gibt für jede Sequenz das wahrscheinlichste Label zurück.
@@ -179,8 +190,8 @@ class HMMClassifier:
         -------
         accuracy : float
         """
-        preds    = self.predict(X, lengths)
-        correct  = sum(p == t for p, t in zip(preds, labels))
+        preds = self.predict(X, lengths)
+        correct = sum(p == t for p, t in zip(preds, labels))
         accuracy = correct / len(labels)
 
         print(f"\nAccuracy: {correct}/{len(labels)} = {accuracy:.1%}")
