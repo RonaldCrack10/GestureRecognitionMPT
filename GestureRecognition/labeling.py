@@ -9,17 +9,49 @@ from SignalHub import Engine, ConfigParser, Webcam
 from GestureRecognition.modules.handdetector import HandDetector
 from GestureRecognition.modules.trailmarker import TrailMarker
 from GestureRecognition.modules.datarecorder import DataRecorder, _StopRecording
+from feature_engineering import _extract_features
+import pickle
+from scipy.interpolate import interp1d
  
  
  
-def _normalize(pts: np.ndarray) -> np.ndarray:
-    pts = pts - pts.mean(axis=0)
-    d   = np.linalg.norm(pts, axis=1).max()
-    if d > 1e-6:
-        pts /= d
-    return pts
- 
- 
+def _normalize(raw_traj: np.ndarray) -> np.ndarray: 
+    """
+    Normalisiert die Punkte durch frame-basiertes Zentrieren und Skalieren.
+    Ersetzt das alte np.tile-Verfahren für exakte Übereinstimmung mit dem Preprocessor.
+    """
+    T = raw_traj.shape[0]
+    # In (T, 21, 3) umwandeln für saubere Indizierung
+    reshaped_traj = raw_traj.reshape(T, 21, 3)
+    
+    # Handgelenk (Landmark 0) abziehen
+    wrist = reshaped_traj[:, 0, :][:, np.newaxis, :]
+    normalized_traj = reshaped_traj - wrist
+
+    # Jedes Frame einzeln auf seine maximale Landmark-Distanz skalieren
+    for t in range(T):
+        frame_dist = np.linalg.norm(normalized_traj[t], axis=1).max()
+        if frame_dist > 1e-6:
+            normalized_traj[t] /= frame_dist
+
+    # Zurückdrehen zu (T, 63)
+    return normalized_traj.reshape(T, 63)
+
+
+def _resample_trajectory(traj: np.ndarray, target_frames: int = 30) -> np.ndarray:
+    """
+    Interpoliert die Sequenz linear auf eine feste Anzahl von Frames (Zeitschritte).
+    Verhindert das Driften von HMM Log-Likelihood-Scores bei unterschiedlichen Geschwindigkeiten.
+    """
+    T = traj.shape[0]
+    if T == target_frames:
+        return traj
+        
+    current_time_grid = np.linspace(0, 1, T)
+    target_time_grid = np.linspace(0, 1, target_frames)
+    
+    f = interp1d(current_time_grid, traj, axis=0, kind='linear', fill_value="extrapolate")
+    return f(target_time_grid).astype(np.float32)
 
  
 def data_labeling(times: int, label: str, finger_idx: int = 8):
@@ -73,16 +105,16 @@ def data_labeling(times: int, label: str, finger_idx: int = 8):
  
 
  
-def _single_recording(save_path: Path, finger_idx: int):
+def _single_recording(save_path: Path, finger_idx: int): # Diese Funktion wird in einem Subprocess aufgerufen, um eine einzelne Aufnahme zu machen. Sie startet die Engine mit einem DataRecorder, der auf ESC wartet, um die Aufnahme zu speichern und die Engine zu stoppen.  
     
 
     recorder = DataRecorder(save_path=save_path, finger_idx=finger_idx)
 
     parser = argparse.ArgumentParser("GestureRecognition")
     parser.add_argument("--mode",        action="store",      default="none")
-    parser.add_argument("--single",      action="store_true", default=False)  # ← neu
-    parser.add_argument("--save-path",   type=str)                            # ← neu
-    parser.add_argument("--finger-idx",  type=int,            default=8)      # ← neu
+    parser.add_argument("--single",      action="store_true", default=False)  
+    parser.add_argument("--save-path",   type=str)                            
+    parser.add_argument("--finger-idx",  type=int,            default=8)      
 
     modules = [
         ConfigParser(parser),
@@ -104,62 +136,65 @@ def _single_recording(save_path: Path, finger_idx: int):
 def dataset_building(output_path):
     """
     Lädt alle .npy-Aufnahmen aus data/<label>/,
-    normalisiert sie und speichert einen hmmlearn-kompatiblen Datensatz.
- 
+    extrahiert Features und speichert einen hmmlearn-kompatiblen Datensatz.
+
     Parameters
     ----------
     output_path : str or Path
         Zielpfad für die dataset.pickle-Datei.
     """
-    import pickle
- 
+
     data_dir    = Path("data")
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
- 
+
     MIN_FRAMES = 15
     X, lengths, labels, classes = [], [], [], []
- 
+
     for label_dir in sorted(data_dir.iterdir()):
         if not label_dir.is_dir() or not any(label_dir.glob("*.npy")):
             continue
- 
+
         label = label_dir.name
         classes.append(label)
         count = 0
- 
+
         for npy in sorted(label_dir.glob("*.npy")):
-            pts = np.load(npy)
- 
-            if len(pts) < MIN_FRAMES:
-                print(f"  ✗ {label}/{npy.name}: {len(pts)} Frames — übersprungen")
+            pts = np.load(npy)               # (T, 21, 3)
+            seq = pts.reshape(len(pts), -1)  # (T, 63)
+
+            if len(seq) < MIN_FRAMES:
                 continue
- 
-            seq = _normalize(pts)
+
+            seq = _resample_trajectory(seq, target_frames=58)  # (30, 63)
+            seq = _extract_features(seq)                        # (30, 156)  ← NEU
+
             X.append(seq)
             lengths.append(len(seq))
             labels.append(label)
             count += 1
             print(f"  ✓ {label}/{npy.name}: {len(seq)} Frames")
- 
+
         print(f"→ '{label}': {count} Sequenzen\n")
- 
+
     if not X:
         print("Dataset leer — keine Daten gefunden.")
         return
- 
+
+   
+
     dataset = {
-        "X":       np.concatenate(X),
+        "X": np.concatenate(X),
         "lengths": lengths,
         "labels":  labels,
         "classes": classes,
     }
- 
+
     with open(output_path, "wb") as f:
         pickle.dump(dataset, f)
- 
+
     print(f"\nDataset gespeichert → {output_path}")
-    print(f"{len(classes)} Klassen · {len(lengths)} Sequenzen · {len(dataset['X'])} Punkte gesamt")
+    print(f"{len(classes)} Klassen · {len(lengths)} Sequenzen · {len(np.concatenate(X))} Frames gesamt")
  
  
  
@@ -178,8 +213,8 @@ if __name__ == "__main__":
         )
     else:
         # Normaler Modus
-        GESTEN    = ["F"]  # ← Gesten anpassen
-        AUFNAHMEN = 10           # ← Anzahl Aufnahmen pro Geste
+        GESTEN    = ["B", "H"]     # ← Gesten anpassen
+        AUFNAHMEN = 30       # ← Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:
             data_labeling(times=AUFNAHMEN, label=geste)
