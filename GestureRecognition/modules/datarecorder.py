@@ -52,13 +52,14 @@ class DataRecorder(Module):
         print("\n  ● Aufnahme läuft — ESC zum Speichern drücken")
         return {}
 
-    # ------------------------------------------------------------------
+    
     def step(self, data: dict) -> dict:
         # Landmark extrahieren
         det = data.get("detector")
         if det is not None and det.hand_landmarks:
-            lm = det.hand_landmarks[0][self.finger_idx]
-            self.points.append([lm.x, lm.y])
+            landmarks = det.hand_landmarks[0]  # alle 21 Landmarks
+            frame = [[lm.x, lm.y, lm.z] for lm in landmarks]  # (21, 3)
+            self.points.append(frame)
 
         # ESC-Check (non-blocking)
         if msvcrt.kbhit():
@@ -69,13 +70,13 @@ class DataRecorder(Module):
 
         return {}
 
-    # ------------------------------------------------------------------
+    
     def stop(self, data: dict) -> None:
         # Wird auch beim normalen Engine-Stop aufgerufen
         if not self.saved:
             self._finalize()
 
-    # ------------------------------------------------------------------
+    
     def _finalize(self) -> None:
         """Speichert Daten oder gibt Warnung aus."""
         n = len(self.points)
