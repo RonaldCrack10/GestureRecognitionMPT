@@ -24,3 +24,5 @@ def run(parser: argparse.ArgumentParser):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("GestureRecognition")
     run(parser)
+
+# um die arrucacy zu erhöhen wurden alle aufnahmen auf gleicher Framelänge reduziert damit die mit mehr frames bei der aufnahme keinen Einfluß auf die Entscheidung haben

@@ -124,4 +124,4 @@ def visualize_class(label: str):
 
 
 # Nutzung — Label anpassen:
-visualize_class("Q")
+visualize_class("A")
