@@ -9,6 +9,7 @@ dependencies = [
     "hmmlearn>=0.3.3",
     "mediapipe>=0.10.32",
     "pyyaml>=6.0.3",
+    "seaborn>=0.13.2",
     "signalhub",
     "tqdm>=4.67.3",
 ]
