@@ -213,7 +213,7 @@ if __name__ == "__main__":
         )
     else:
         # Normaler Modus
-        GESTEN    = ["B", "P"]     # ← Gesten anpassen
+        GESTEN    = ["A"]     # ← Gesten anpassen
         AUFNAHMEN = 10       # ← Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:
