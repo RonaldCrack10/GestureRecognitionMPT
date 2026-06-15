@@ -1,7 +1,10 @@
 import pickle
 import numpy as np
 from hmmlearn import hmm
-
+import pickle as pkl
+from pathlib import Path
+import seaborn as sb
+from matplotlib import pyplot as plt
 
 class HMMClassifier:
     """
@@ -10,27 +13,17 @@ class HMMClassifier:
     Trainiert ein GaussianHMM pro Klasse und klassifiziert
     neue Sequenzen anhand der höchsten Log-Likelihood.
 
-    Parameters
-    ----------
-    n_components : int
-        Anzahl der versteckten Zustände pro HMM.
-    n_iter : int
-        Maximale Anzahl der EM-Iterationen beim Training.
-    random_state : int
-        Seed für Reproduzierbarkeit.
-    test_size : float
-        Anteil der Daten für den Testset (0.0 - 1.0).
     """
 
     def __init__(self, n_components: int = 5, n_iter: int = 100,
                  random_state: int = 42, test_size: float = 0.2):
         self.n_components  = n_components
-        self.n_iter        = n_iter
+        self.n_iter = n_iter
         self.random_state  = random_state
-        self.test_size     = test_size
+        self.test_size = test_size
 
-        self.models_  : dict = {}   # label -> GaussianHMM
-        self.classes_ : list = []
+        self.models  : dict = {}   
+        self.classes : list = []
 
    
 
@@ -48,36 +41,36 @@ class HMMClassifier:
             Label jeder Sequenz — muss dieselbe Länge wie ``lengths`` haben.
         """
         assert len(lengths) == len(labels), "lengths und labels müssen gleich lang sein"
-
-        self.classes_ = sorted(set(labels))
+        
+        self.classes = sorted(set(labels)) # 26. Jede Klasse wird nur einmal erkannt 
 
         # Sequenzen nach Label gruppieren
-        class_seqs: dict = {c: [] for c in self.classes_}
+        class_seqs: dict = {c: [] for c in self.classes}
         idx = 0
-        for length, label in zip(lengths, labels):
+        for length, label in zip(lengths, labels): # Jede Sequezen wird ihrer Klasse zugewiesen
             class_seqs[label].append(X[idx : idx + length])
             idx += length
 
-        rng = np.random.default_rng(self.random_state)
+        rng = np.random.default_rng(self.random_state) # random number generator
 
-        for label in self.classes_:
-            seqs  = class_seqs[label]
-            n     = len(seqs)
+        for label in self.classes:
+            seqs = class_seqs[label]
+            n = len(seqs)
 
             if n < 2:
-                print(f"  ✗ '{label}': zu wenig Sequenzen ({n}) — übersprungen")
+                print(f"'{label}': zu wenig Sequenzen ({n}) — übersprungen")
                 continue
 
-            # Train / Test Split
-            perm    = rng.permutation(n) # permutation der Indizes für zufällige Aufteilung des Datensatzes
+            # Train Test Split
+            perm = rng.permutation(n) # permutation der Indizes für zufällige Aufteilung des Datensatzes
             n_test  = max(1, int(n * self.test_size))
             n_train = n - n_test
 
             train_seqs = [seqs[i] for i in perm[:n_train]]
             test_seqs  = [seqs[i] for i in perm[n_train:]]
 
-            X_train      = np.concatenate(train_seqs)
-            lens_train   = [len(s) for s in train_seqs]
+            X_train = np.concatenate(train_seqs)
+            lens_train = [len(s) for s in train_seqs]
 
             model = hmm.GaussianHMM(
                 n_components    = self.n_components,
@@ -88,18 +81,18 @@ class HMMClassifier:
                 min_covar=1e-2  # Verhindert zu kleine Varianzen, die zu Singularitäten führen können
             )
             model.fit(X_train, lens_train)
-            self.models_[label] = model
+            self.models[label] = model
 
             # Evaluation auf Trainings- und Testdaten
             train_ll = model.score(X_train, lens_train) / sum(lens_train)
-            X_test   = np.concatenate(test_seqs)
+            X_test = np.concatenate(test_seqs)
             lens_test = [len(s) for s in test_seqs]
             test_ll  = model.score(X_test, lens_test) / sum(lens_test)
 
             print(f"  ✓ '{label}':  {n_train} train / {n_test} test  |  "
                   f"train ll: {train_ll:.3f}  test ll: {test_ll:.3f}")
 
-        print(f"\nTraining abgeschlossen — {len(self.models_)} Modelle trainiert.")
+        print(f"\nTraining abgeschlossen — {len(self.models)} Modelle trainiert.")
         return self
 
 
@@ -107,21 +100,14 @@ class HMMClassifier:
         """
         Berechnet Log-Likelihood jeder Sequenz unter jedem Klassenmodell.
 
-        Parameters
-        ----------
-        X       : np.ndarray  - Sequenzen im hmmlearn-Format
-        lengths : list[int]   - Länge jeder Sequenz
-
-        Returns
-        -------
-        scores : np.ndarray, shape (n_sequences, n_classes)
+        
         """
-        n_seq  = len(lengths)
-        n_cls  = len(self.classes_)
+        n_seq = len(lengths)
+        n_cls = len(self.classes)
         scores = np.full((n_seq, n_cls), -np.inf) # till infinity because log-likelihoods can be very negative and we want to avoid numerical issues
-
-        for j, label in enumerate(self.classes_):
-            model = self.models_.get(label)
+        # erstellt eine Matrix gefüllt mit negativem Unendlich und wenn ein model einen fehler hat bleibt der score bei - unendlich
+        for j, label in enumerate(self.classes):
+            model = self.models.get(label)
             if model is None:
                 continue
 
@@ -149,30 +135,16 @@ class HMMClassifier:
         """
         Gibt für jede Sequenz das wahrscheinlichste Label zurück.
 
-        Parameters
-        ----------
-        X       : np.ndarray
-        lengths : list[int]
-
-        Returns
-        -------
-        labels : list[str]
+        
         """
         scores  = self.decision_function(X, lengths)
         indices = np.argmax(scores, axis=1)
-        return [self.classes_[i] for i in indices]
+        return [self.classes[i] for i in indices]
 
     def predict_single(self, seq: np.ndarray) -> str:
         """
         Klassifiziert eine einzelne Sequenz.
 
-        Parameters
-        ----------
-        seq : np.ndarray, shape (n_frames, n_features)
-
-        Returns
-        -------
-        label : str
         """
         return self.predict(seq, [len(seq)])[0]
 
@@ -180,15 +152,8 @@ class HMMClassifier:
 
     def evaluate(self, X: np.ndarray, lengths: list, labels: list) -> float:
         """
-        Berechnet die Accuracy auf einem Datensatz.
+        Berechnet die Accuracy auf dem Datensatz.
 
-        Parameters
-        ----------
-        X, lengths, labels : wie bei fit()
-
-        Returns
-        -------
-        accuracy : float
         """
         preds = self.predict(X, lengths)
         correct = sum(p == t for p, t in zip(preds, labels))
@@ -196,19 +161,33 @@ class HMMClassifier:
 
         print(f"\nAccuracy: {correct}/{len(labels)} = {accuracy:.1%}")
 
-        # Konfusionsmatrix ausgeben
-        print("\nKonfusionsmatrix:")
-        print(f"{'':>6}", end="")
-        for c in self.classes_:
-            print(f"{c:>6}", end="")
-        print()
-        for true_c in self.classes_:
-            print(f"{true_c:>6}", end="")
-            for pred_c in self.classes_:
-                count = sum(p == pred_c and t == true_c
-                            for p, t in zip(preds, labels))
-                print(f"{count:>6}", end="")
-            print()
+        # Konfusionsmatrix 
+        
+        n = len(self.classes)
+        cm = np.zeros((n, n), dtype=int)
+        class_to_idx = {c: i for i, c in enumerate(self.classes)}
+
+        for true_label, pred_label in zip(labels, preds):
+            i = class_to_idx[true_label]
+            j = class_to_idx[pred_label]
+            cm[i, j] += 1
+
+        
+        plt.figure(figsize=(14, 12))
+        sb.heatmap(
+            cm,
+            annot=True,
+            fmt='d',
+            xticklabels=self.classes,
+            yticklabels=self.classes,
+            cmap='Blues'
+        )
+        plt.xlabel("Vorhersage")
+        plt.ylabel("Ground Truth")
+        plt.title(f"Accuracy: {accuracy:.1%}")
+        plt.tight_layout()
+        plt.show()
+                
 
         return accuracy
 
@@ -230,18 +209,17 @@ class HMMClassifier:
 
 
 
-if __name__ == "__main__":
-    import pickle as pkl
-    from pathlib import Path
+# if __name__ == "__main__":
+    
 
-    dataset_path = Path("data/dataset.pickle")
-    if not dataset_path.exists():
-        print("Kein Dataset gefunden. Erst labeling.py ausführen.")
-    else:
-        with open(dataset_path, "rb") as f:
-            ds = pkl.load(f)
+#     dataset_path = Path("data/dataset.pickle")
+#     if not dataset_path.exists():
+#         print("Kein Dataset gefunden. Erst labeling.py ausführen.")
+#     else:
+#         with open(dataset_path, "rb") as f:
+#             ds = pkl.load(f)
 
-        clf = HMMClassifier(n_components=4, n_iter=100, test_size=0.2)
-        clf.fit(ds["X"], ds["lengths"], ds["labels"])
-        clf.evaluate(ds["X"], ds["lengths"], ds["labels"])
-        clf.save("data/hmm_model.pickle")
+#         clf = HMMClassifier(n_components=4, n_iter=100, test_size=0.2)
+#         clf.fit(ds["X"], ds["lengths"], ds["labels"])
+#         clf.evaluate(ds["X"], ds["lengths"], ds["labels"])
+#         clf.save("data/hmm_model.pickle")

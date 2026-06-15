@@ -39,11 +39,11 @@ class HMMModule(Module):
             best_label = self.model.predict_single(seq)
             best_score = float(np.max(scores_arr))
 
-            print(f"seq shape:  {seq.shape}")
-            print(f"seq min:    {seq.min():.4f}")
-            print(f"seq max:    {seq.max():.4f}")
-            print(f"seq mean:   {seq.mean():.4f}")
-            print(f"scores:     {dict(zip(self.model.classes_, scores_arr))}")
+            # print(f"seq shape:  {seq.shape}")
+            # print(f"seq min:    {seq.min():.4f}")
+            # print(f"seq max:    {seq.max():.4f}")
+            # print(f"seq mean:   {seq.mean():.4f}")
+            # print(f"scores:     {dict(zip(self.model.classes_, scores_arr))}")
 
             self.last_result = {
                 "label":  best_label,
