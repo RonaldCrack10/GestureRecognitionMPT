@@ -32,23 +32,23 @@ class HMMModule(Module):
         trajectory = get_nested_key('preprocessor', data)
 
         if trajectory is not None and len(trajectory) > 0:
-            # Preprocessor already normalizes, use data as-is
+            
             seq = np.array(trajectory, dtype=np.float32)
 
             scores_arr = self.model.decision_function(seq, [len(seq)])[0]
             best_label = self.model.predict_single(seq)
             best_score = float(np.max(scores_arr))
-
-            # print(f"seq shape:  {seq.shape}")
-            # print(f"seq min:    {seq.min():.4f}")
-            # print(f"seq max:    {seq.max():.4f}")
-            # print(f"seq mean:   {seq.mean():.4f}")
-            # print(f"scores:     {dict(zip(self.model.classes_, scores_arr))}")
+            seq = np.array(trajectory, dtype=np.float32)
+            print(f"seq shape: {seq.shape}")
+            print(f"seq min:   {seq.min():.4f}")
+            print(f"seq max:   {seq.max():.4f}")
+            scores_arr = self.model.decision_function(seq, [len(seq)])[0]
+            print(f"scores: {dict(zip(self.model.classes, scores_arr))}")
 
             self.last_result = {
                 "label":  best_label,
                 "score":  best_score,
-                "scores": dict(zip(self.model.classes_, scores_arr)),
+                "scores": dict(zip(self.model.classes, scores_arr)),
             }
         if self.last_result is None:
             return {}
@@ -63,7 +63,8 @@ class HMMModule(Module):
             f"{self.last_result['label']}  {self.last_result['score']:.2f}",
             (int(width * 0.05), int(height * 0.1)),
             fontScale = 1.5,
-            color     = bgr("#FC0000"),
+            color= bgr("#FC0000"),
+            thickness=4
         )
         
         return {self.outputSignal: self.last_result, "galy": galy}

@@ -24,6 +24,8 @@ class HMMClassifier:
 
         self.models  : dict = {}   
         self.classes : list = []
+        self.test_data : dict = {}  # Store test data separately for proper evaluation
+        self.test_lengths : dict = {}  # Store test sequence lengths per class
 
    
 
@@ -85,12 +87,12 @@ class HMMClassifier:
 
             # Evaluation auf Trainings- und Testdaten
             train_ll = model.score(X_train, lens_train) / sum(lens_train)
-            X_test = np.concatenate(test_seqs)
-            lens_test = [len(s) for s in test_seqs]
-            test_ll  = model.score(X_test, lens_test) / sum(lens_test)
+            # X_test = np.concatenate(test_seqs)
+            # lens_test = [len(s) for s in test_seqs]
+            # test_ll  = model.score(X_test, lens_test) / sum(lens_test)
 
-            print(f"  ✓ '{label}':  {n_train} train / {n_test} test  |  "
-                  f"train ll: {train_ll:.3f}  test ll: {test_ll:.3f}")
+            print(f"  ✓ '{label}':  {n_train} train  "
+                  f"train ll: {train_ll:.3f} ")
 
         print(f"\nTraining abgeschlossen — {len(self.models)} Modelle trainiert.")
         return self

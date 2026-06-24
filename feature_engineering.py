@@ -1,26 +1,23 @@
-"""
-feature_engineering.py
-Drop-in replacement for the _normalize + feature extraction in labeling.py.
 
-Current baseline: 63 raw xyz coords per frame
-New feature vector: 63 + 15 + 15 + 63 = 156 dims per frame
-
-How to use
-----------
-Replace _normalize(seq) in dataset_building() with _extract_features(seq):
-
-    seq = pts.reshape(len(pts), -1)      # (T, 63)
-    seq = _extract_features(seq)         # (T, 156)  ← was _normalize(seq)
-"""
 
 import numpy as np
 
-# MediaPipe hand landmark indices
+"""
+[0 bis 63] Handform (Normalisiert): Die reinen Positionen der Hand, bereinigt von Kameraabstand und Bildposition.
+
+[63 bis 78] Abstände (15 Werte): Es misst den Abstand zwischen Fingerspitzen (z.B. Daumen zu Zeigefinger). ( "O" oder "C" zu unterscheiden).
+
+[78 bis 93] Beugewinkel (15 Werte): Es berechnet exakt, wie stark jeder einzelne Finger eingeknickt oder ausgestreckt ist. Das ist eine wichtige Info, um ähnliche Buchstaben wie A, E, S und T zu unterscheiden.
+
+[93 bis 156] Geschwindigkeit/Bewegung (63 Werte): Es misst, wie schnell und in welche Richtung sich jeder Punkt im Vergleich zum vorherigen Frame bewegt hat. Das ist überlebenswichtig für dynamische Buchstaben wie J und Z, die eine Bewegung voraussetzen.
+
+"""
+
+
 WRIST = 0
 
-# Fingertip and base landmarks for each finger
-#           tip   pip   mcp
-FINGERS = [
+
+fingers = [
     (4,  3,  2),   # thumb
     (8,  7,  5),   # index
     (12, 11, 9),   # middle
@@ -28,23 +25,23 @@ FINGERS = [
     (20, 19, 17),  # pinky
 ]
 
-# Pairs for key inter-landmark distances (captures hand shape)
-DISTANCE_PAIRS = [
-    (4,  8),   # thumb tip  ↔ index tip   (pinch)
-    (4,  12),  # thumb tip  ↔ middle tip
-    (4,  16),  # thumb tip  ↔ ring tip
-    (4,  20),  # thumb tip  ↔ pinky tip
-    (8,  12),  # index tip  ↔ middle tip  (V/U discrimination)
-    (8,  16),  # index tip  ↔ ring tip
-    (12, 16),  # middle tip ↔ ring tip
-    (16, 20),  # ring tip   ↔ pinky tip
-    (5,  17),  # index mcp  ↔ pinky mcp   (palm width — scale ref)
-    (0,  9),   # wrist      ↔ middle mcp  (palm height — scale ref)
-    (8,  5),   # index tip  ↔ index mcp   (finger extension)
-    (12, 9),   # middle tip ↔ middle mcp
-    (16, 13),  # ring tip   ↔ ring mcp
-    (20, 17),  # pinky tip  ↔ pinky mcp
-    (4,  0),   # thumb tip  ↔ wrist
+# Pairs for key inter-landmark distances 
+distance_pairs = [
+    (4,  8),   
+    (4,  12),  
+    (4,  16),  
+    (4,  20),  
+    (8,  12),  
+    (8,  16),  
+    (12, 16),  
+    (16, 20),  
+    (5,  17),  
+    (0,  9),   
+    (8,  5),    
+    (12, 9),   
+    (16, 13),  
+    (20, 17),  
+    (4,  0),   
 ]
 
 
@@ -55,26 +52,29 @@ def _get_landmarks(pts_flat: np.ndarray) -> np.ndarray:
 
 def _normalize_coords(pts: np.ndarray) -> np.ndarray:
     """
-    Normalize (T, 63) coords:
-      - subtract wrist (landmark 0) to center
-      - scale by hand span (distance between index MCP #5 and pinky MCP #17)
-        This is more stable than max-norm because it's a consistent anatomical
-        distance rather than being driven by whichever landmark happens to be
-        furthest away in a given frame.
+    Normalisiert die Zeichnung auf [0, 1] basierend auf der 
+    Bounding Box aller Fingerspitzen über die gesamte Sequenz.
     """
-    lm = _get_landmarks(pts)                        # (T, 21, 3)
-    wrist = lm[:, WRIST:WRIST+1, :]                 # (T, 1, 3)
-    lm = lm - wrist                                 # center on wrist
+    lm = _get_landmarks(pts)  # (T, 21, 3)
+    T  = lm.shape[0]
 
-    # Palm width as scale reference (more stable than max-norm)
-    palm_width = np.linalg.norm(
-        lm[:, 5, :] - lm[:, 17, :], axis=1, keepdims=True  # (T, 1)
-    )
-    palm_width = np.maximum(palm_width, 1e-6)[:, :, np.newaxis]  # (T, 1, 1)
-    lm = lm / palm_width
+    # Alle Fingerspitzen für die Bounding Box verwenden
+    TIPS = [4, 8, 12, 16, 20]
+    tip_traj = lm[:, TIPS, :2]        # (T, 5, 2) — nur x,y
+    tip_traj = tip_traj.reshape(T*5, 2)
 
-    return lm.reshape(len(pts), 63)
+    global_min = tip_traj.min(axis=0)  # [x_min, y_min]
+    global_max = tip_traj.max(axis=0)  # [x_max, y_max]
+    global_range = global_max - global_min
+    max_span = np.maximum(global_range.max(), 1e-6)
 
+    # Alle Landmarks relativ zur Bounding Box verschieben
+    for t in range(T):
+        lm[t, :, :2] = (lm[t, :, :2] - global_min) / max_span
+        # z-Koordinate wrist-relativ lassen
+        lm[t, :, 2]  = lm[t, :, 2] - lm[t, 0, 2]
+
+    return lm.reshape(T, 63)
 
 def _inter_landmark_distances(lm: np.ndarray) -> np.ndarray:
     """
@@ -84,23 +84,14 @@ def _inter_landmark_distances(lm: np.ndarray) -> np.ndarray:
     returns: (T, 15)
     """
     dists = []
-    for (i, j) in DISTANCE_PAIRS:
+    for (i, j) in distance_pairs:
         d = np.linalg.norm(lm[:, i, :] - lm[:, j, :], axis=1, keepdims=True)
         dists.append(d)
     return np.concatenate(dists, axis=1)  # (T, 15)
 
 
 def _finger_angles(lm: np.ndarray) -> np.ndarray:
-    """
-    Compute bend angle at the PIP joint for each of the 5 fingers (15 values:
-    3 angles per finger — MCP, PIP, DIP).
-    Angle = arccos of the dot product of the two bone vectors.
-    These directly encode finger curl, which differentiates many ASL pairs
-    (e.g. E vs A, B vs 4, S vs A).
-    lm: (T, 21, 3)
-    returns: (T, 15)
-    """
-    # Full joint chains per finger: [mcp, pip, dip, tip]
+    
     chains = [
         [1, 2, 3, 4],    # thumb
         [5, 6, 7, 8],    # index
@@ -124,36 +115,34 @@ def _finger_angles(lm: np.ndarray) -> np.ndarray:
     return np.concatenate(angles, axis=1)  # (T, 15)
 
 
-def _velocity(coords: np.ndarray) -> np.ndarray:
-    """
-    Frame-to-frame delta of the normalized coords.
-    Captures motion information — critical for dynamic letters like J and Z.
-    Velocity at frame 0 is set to zero (no prior frame).
-    coords: (T, 63)
-    returns: (T, 63)
-    """
-    vel = np.zeros_like(coords)
-    vel[1:] = coords[1:] - coords[:-1]
-    return vel
+# def _velocity(coords: np.ndarray) -> np.ndarray:
+#     """
+#     Frame-to-frame delta of the normalized coords.
+#     Captures motion information — critical for dynamic letters like J and Z.
+#     Velocity at frame 0 is set to zero (no prior frame).
+#     coords: (T, 63)
+#     returns: (T, 63)
+#     """
+#     vel = np.zeros_like(coords)
+#     vel[1:] = coords[1:] - coords[:-1]
+#     return vel
 
 
 def _extract_features(pts_flat: np.ndarray) -> np.ndarray:
     """
-    Main entry point. Replaces _normalize() in dataset_building().
+    Main entry point. For STATIC gestures only (no motion needed).
 
     Input:  (T, 63)  raw flattened MediaPipe landmarks
-    Output: (T, 156) engineered feature vector
+    Output: (T, 93) engineered feature vector
 
     Feature breakdown:
       [  0: 63]  normalized xyz coords          — hand pose
       [ 63: 78]  inter-landmark distances (15)  — shape, rotation-invariant
       [ 78: 93]  finger bend angles (15)        — curl encoding
-      [ 93:156]  frame-to-frame velocity (63)   — motion (key for J, Z)
     """
-    coords = _normalize_coords(pts_flat)
+    coords = pts_flat
     lm = _get_landmarks(coords)
     dists  = _inter_landmark_distances(lm)
     angles = _finger_angles(lm)
-    vel    = _velocity(coords)
-    return np.concatenate([coords, dists, angles, vel], axis=1)
+    return np.concatenate([coords, dists, angles], axis=1)
 

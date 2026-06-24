@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 from pathlib import Path
 
+
 CONNECTIONS = [
     (0,1),(1,2),(2,3),(3,4),
     (0,5),(5,6),(6,7),(7,8),
@@ -123,5 +124,5 @@ def visualize_class(label: str):
     plt.show()
 
 
-# Nutzung — Label anpassen:
-visualize_class("X")
+
+visualize_class("P") # a b

@@ -203,7 +203,7 @@ class TrailMarker(Module):
         points = list(self.history)
         n = len(points)
         for i in range(1, n):
-            galy.line(points[i-1], points[i], (255, 255, 0), thickness= 2)
+            galy.line(points[i-1], points[i], (255, 255, 0), thickness= 5)
             
 
         return {self.outputSignal: {}, "galy": galy}

@@ -40,7 +40,7 @@ class DataRecorder(Module):
             outputSchema = {}
         )
 
-    # ------------------------------------------------------------------
+    
     def start(self, data: dict) -> dict:
         self.points = []
         self.saved  = False
@@ -61,12 +61,11 @@ class DataRecorder(Module):
             frame = [[lm.x, lm.y, lm.z] for lm in landmarks]  # (21, 3)
             self.points.append(frame)
 
-        # ESC-Check (non-blocking)
         if msvcrt.kbhit():
             key = msvcrt.getch()
             if key == b"\x1b":          # ESC
                 self._finalize()
-                raise _StopRecording()     # Engine sauber stoppen
+                raise _StopRecording()     
 
         return {}
 
