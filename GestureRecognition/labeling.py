@@ -228,7 +228,7 @@ if __name__ == "__main__":
         )
     else:
         
-        GESTEN    = ["O", "J", "E", "Y", "P"]     # Gesten anpassen
+        GESTEN    = ["L", "X", "Q", "S", "N", "W"]     # Gesten anpassen
         AUFNAHMEN = 10       # Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:

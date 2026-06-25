@@ -89,6 +89,13 @@ class Preprocessor(Module):
             landmarks = result.hand_landmarks[0]
             frame = [coord for lm in landmarks for coord in (lm.x, lm.y, lm.z)]
             self.history.append(frame)
+
+            if len(self.history) >= self.min_steps:
+                raw = np.array(self.history, dtype=np.float32)
+                norm = _normalize_coords(raw)
+                res  = self._resample(norm)       # immer auf 65 Frames skalieren
+                feat = _extract_features(res)
+                result_trajectory = feat          # ← bei jedem Frame senden
             
 
         else:
