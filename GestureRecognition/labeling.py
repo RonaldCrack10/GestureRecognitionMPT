@@ -228,8 +228,8 @@ if __name__ == "__main__":
         )
     else:
         
-        GESTEN    = ["L", "X", "Q", "S", "N", "W"]     # Gesten anpassen
-        AUFNAHMEN = 10       # Anzahl Aufnahmen pro Geste
+        GESTEN    = ["R"]     # Gesten anpassen
+        AUFNAHMEN = 20       # Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:
             data_labeling(times=AUFNAHMEN, label=geste)

@@ -1,6 +1,7 @@
 import pickle
 import numpy as np
 from GestureRecognition.hmmclassifier import HMMClassifier
+from collections import Counter
 
 with open("data/dataset.pickle", "rb") as f:
     ds = pickle.load(f)
@@ -33,7 +34,8 @@ X_test  = np.concatenate(test_seqs)
 lens_train = [len(s) for s in train_seqs]
 lens_test  = [len(s) for s in test_seqs]
 
-clf = HMMClassifier(n_components=7, n_iter=500, test_size=0.0)  # kein interner split
+
+clf = HMMClassifier(n_components=7, n_iter=300, test_size=0.1)  # kein interner split
 clf.fit(X_train, lens_train, train_labels)
 clf.evaluate(X_test, lens_test, test_labels)
 clf.save("data/hmm_model.pickle")
