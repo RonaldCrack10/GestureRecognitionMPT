@@ -69,7 +69,6 @@ class HMMClassifier:
             n_train = n - n_test
 
             train_seqs = [seqs[i] for i in perm[:n_train]]
-            test_seqs  = [seqs[i] for i in perm[n_train:]]
 
             X_train = np.concatenate(train_seqs)
             lens_train = [len(s) for s in train_seqs]
@@ -87,9 +86,6 @@ class HMMClassifier:
 
             # Evaluation auf Trainings- und Testdaten
             train_ll = model.score(X_train, lens_train) / sum(lens_train)
-            # X_test = np.concatenate(test_seqs)
-            # lens_test = [len(s) for s in test_seqs]
-            # test_ll  = model.score(X_test, lens_test) / sum(lens_test)
 
             print(f"  ✓ '{label}':  {n_train} train  "
                   f"train ll: {train_ll:.3f} ")
