@@ -37,6 +37,6 @@ for i, label in enumerate(classes):
 for j in range(len(classes), len(axes)):
     axes[j].set_visible(False)
 
-plt.suptitle("Trajektorien nach Verarbeitung — was das Modell sieht", fontsize=14)
+plt.suptitle("Trajektorien nach Verarbeitung", fontsize=14)
 plt.tight_layout()
 plt.show()
