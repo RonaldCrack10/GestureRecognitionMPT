@@ -1,3 +1,9 @@
+hmmlearn==0.3.3
+keyboard==0.13.5
+matplotlib==3.10.1
 mediapipe==0.10.32
+numpy==2.2.4
+opencv-python==4.11.0.86
+scikit-learn==1.6.1
+seaborn==0.13.2
 signalhub @ git+https://github.com/jaboll-ai/SignalHub.git@pyproject
-tqdm==4.67.3

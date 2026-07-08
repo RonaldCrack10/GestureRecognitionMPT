@@ -3,7 +3,6 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from fontTools.misc.classifyTools import Classifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 def visualize_dataset(label_pfad, label_name):
