@@ -58,7 +58,7 @@ class DataRecorder(Module):
         det = data.get("detector")
         if det is not None and det.hand_landmarks:
             landmarks = det.hand_landmarks[0]  # alle 21 Landmarks
-            frame = [[lm.x, lm.y, lm.z] for lm in landmarks]  # (21, 3)
+            frame = [[lm.x, lm.y] for lm in landmarks]  # (21, 3)
             self.points.append(frame)
 
         if msvcrt.kbhit():

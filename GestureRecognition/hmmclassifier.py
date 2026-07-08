@@ -65,7 +65,7 @@ class HMMClassifier:
 
             # Train Test Split
             perm = rng.permutation(n) # permutation der Indizes für zufällige Aufteilung des Datensatzes
-            n_test  = max(1, int(n * self.test_size))
+            n_test  = int(n * self.test_size)
             n_train = n - n_test
 
             train_seqs = [seqs[i] for i in perm[:n_train]]

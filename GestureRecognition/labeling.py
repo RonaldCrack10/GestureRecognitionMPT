@@ -9,30 +9,11 @@ from SignalHub import Engine, ConfigParser, Webcam
 from GestureRecognition.modules.handdetector import HandDetector
 from GestureRecognition.modules.trailmarker import TrailMarker
 from GestureRecognition.modules.datarecorder import DataRecorder, _StopRecording
-from feature_engineering import _extract_features, _normalize_coords
 import pickle
 from scipy.interpolate import interp1d
  
  
  
-
-
-
-def _resample_trajectory(traj: np.ndarray, target_frames: int = 65) -> np.ndarray:
-    """
-    Interpoliert die Sequenz linear auf eine feste Anzahl von Frames (Zeitschritte).
-    Verhindert das Driften von HMM Log-Likelihood-Scores bei unterschiedlichen Geschwindigkeiten.
-    """
-    T = traj.shape[0]
-    if T == target_frames:
-        return traj
-        
-    current_time_grid = np.linspace(0, 1, T)
-    target_time_grid = np.linspace(0, 1, target_frames)
-    
-    f = interp1d(current_time_grid, traj, axis=0, kind='linear', fill_value="extrapolate")
-    return f(target_time_grid).astype(np.float32)
-
  
 def data_labeling(times: int, label: str, finger_idx: int = 8):
     """
@@ -120,17 +101,7 @@ def _single_recording(save_path: Path, finger_idx: int): # Diese Funktion wird i
     except (_StopRecording, SystemExit, Exception):
         pass
 
-def _normalize(pts: np.ndarray) -> np.ndarray:
-    """Zentrieren + Frame-weise Skalieren → (T, 63)"""
-    T = pts.shape[0]
-    lm = pts.reshape(T, 21, 3)
-    wrist = lm[:, 0:1, :]
-    lm = lm - wrist
-    for t in range(T):
-        d = np.linalg.norm(lm[t], axis=1).max()
-        if d > 1e-6:
-            lm[t] /= d
-    return lm.reshape(T, 63)
+
 
 def _resample(traj: np.ndarray, target_frames: int = 65) -> np.ndarray:
     """Interpoliert (T, 63) → (target_frames, 63)"""
@@ -146,13 +117,41 @@ def _resample(traj: np.ndarray, target_frames: int = 65) -> np.ndarray:
     )
     return f(np.linspace(0, 1, target_frames)).astype(np.float32)
 TARGET_FRAMES = 65
+
+def _normalize_trajectory_only(pts_flat: np.ndarray) -> np.ndarray:
+    """
+    Normalisiert die Sequenz so, dass die Flugbahn der Zeigefingerspitze (Landmark 8)
+    perfekt in eine Einheitsbox [0, 1] passt. Die restlichen Hand-Landmarks 
+    werden relativ dazu mitverschrumpft/-geweitet, ohne ihre Form zu verlieren.
+    """
+    T = pts_flat.shape[0]
+    lm = pts_flat.reshape(T, 21, 2)
+    
+    # 1. Extrahiere die Flugbahn NUR von Landmark 8 (Zeigefingerspitze)
+    # Form: (T, 2)
+    tip_trajectory = lm[:, 8, :]
+    
+    # 2. Finde die Bounding-Box NUR für die Zeichnung der Fingerspitze
+    min_coords = tip_trajectory.min(axis=0)  # [min_x, min_y] der Zeichnung
+    max_coords = tip_trajectory.max(axis=0)  # [max_x, max_y] der Zeichnung
+    
+    # 3. Berechne die maximale Ausdehnung der Zeichnung (Breite oder Höhe)
+    span = max_coords - min_coords
+    max_span = np.maximum(span.max(), 1e-6)  # Verhindert Division durch 0 bei Standbildern
+    
+    # 4. Wende diese Skalierung auf ALLE 21 Landmarks an
+    # Wir ziehen von jedem Punkt das Minimum der Fingerspitze ab und teilen durch die Fingerspitzen-Spanne
+    for t in range(T):
+        lm[t] = (lm[t] - min_coords) / max_span
+        
+    return lm.reshape(T, 42)
  
  
  
 def dataset_building(output_path):
     """
-    Lädt alle .npy-Aufnahmen, wendet die Bounding-Box-Normalisierung auf die 
-    Zeichnung an, interpoliert, extrahiert Features und standardisiert das Dataset.
+    Lädt alle .npy-Aufnahmen, reduziert sie auf X- und Y-Koordinaten,
+    interpoliert sie auf eine feste Frame-Anzahl und speichert das Dataset.
     """
     data_dir    = Path("data")
     output_path = Path(output_path)
@@ -169,22 +168,19 @@ def dataset_building(output_path):
         classes.append(label)
 
         for npy in sorted(label_dir.glob("*.npy")):
-            pts = np.load(npy)  # Rohdaten (T, 21, 3)
-            pts = pts.reshape(len(pts), -1)  # (T, 63)
+            pts = np.load(npy)  # Rohdaten laden
 
-            if len(pts) < MIN_FRAMES:
-                print(f"  ✗ {label}/{npy.name}: {len(pts)} Frames — übersprungen")
+            # 2. Jetzt erst flachklopfen auf (T, 42)
+            pts_flat = pts.reshape(len(pts), 42)
+
+            if len(pts_flat) < MIN_FRAMES:
+                print(f"  ✗ {label}/{npy.name}: Zu kurz ({len(pts_flat)} Frames) — übersprungen")
                 continue
 
-            # 1. Bounding-Box-Normalisierung (Zentriert die ZEICHNUNG auf [0, 1])
-            seq = _normalize_coords(pts)        
-            
-            # 2. Auf feste Frame-Anzahl bringen
-            seq = _resample(seq, TARGET_FRAMES)  # Liefert (65, 63)
-            
-            # 3. Komplexe Features extrahieren
-            seq = _extract_features(seq)         # Liefert (65, 93)
-            
+            pts_normalized = _normalize_trajectory_only(pts_flat)
+
+            # 3. Auf feste Frame-Anzahl bringen -> Liefert (65, 42)
+            seq = _resample(pts_normalized, TARGET_FRAMES) 
             
             X.append(seq)
             lengths.append(len(seq))
@@ -195,14 +191,13 @@ def dataset_building(output_path):
         print("Dataset leer — keine Daten gefunden.")
         return
 
-    X_combined = np.concatenate(X)  # Form: (Gesamt_Frames, 93)
+    X_combined = np.concatenate(X)  # Form: (Gesamt_Frames, 42)
     
     dataset = {
         "X": X_combined,
         "lengths": lengths,
         "labels":  labels,
         "classes": classes,
-                   
     }
 
     with open(output_path, "wb") as f:
@@ -228,8 +223,8 @@ if __name__ == "__main__":
         )
     else:
         
-        GESTEN    = ["D", "O", "V"]     # Gesten anpassen
-        AUFNAHMEN = 10       # Anzahl Aufnahmen pro Geste
+        GESTEN    = ["O", "E"]     # Gesten anpassen WP
+        AUFNAHMEN = 20      # Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:
             data_labeling(times=AUFNAHMEN, label=geste)

@@ -35,7 +35,7 @@ lens_train = [len(s) for s in train_seqs]
 lens_test  = [len(s) for s in test_seqs]
 
 
-clf = HMMClassifier(n_components=9, n_iter=700, test_size=0.0)  # kein interner split
+clf = HMMClassifier(n_components=8, n_iter=200, test_size=0.0)  # kein interner split
 clf.fit(X_train, lens_train, train_labels)
 clf.evaluate(X_test, lens_test, test_labels)
 clf.save("data/hmm_model.pickle")

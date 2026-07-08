@@ -2,7 +2,7 @@ from SignalHub import GALY, Module
 from collections import deque
 import numpy as np
 from scipy.interpolate import interp1d
-from feature_engineering import _extract_features, _normalize_coords
+from GestureRecognition.labeling import _normalize_trajectory_only
 
 
 class Preprocessor(Module):
@@ -25,18 +25,7 @@ class Preprocessor(Module):
                 return False
         return True
 
-    # def _normalize(self, raw_traj: np.ndarray) -> np.ndarray:
-    #     """Zentrieren + Frame-weise Skalieren → (T, 63)"""
-    #     T = raw_traj.shape[0]
-    #     lm = raw_traj.reshape(T, 21, 3)
-    #     wrist = lm[:, 0:1, :]
-    #     lm = lm - wrist
-    #     for t in range(T):
-    #         d = np.linalg.norm(lm[t], axis=1).max()
-    #         if d > 1e-6:
-    #             lm[t] /= d
-    #     return lm.reshape(T, 63)
-
+   
     def _resample(self, traj: np.ndarray) -> np.ndarray:
         """Interpoliert (T, 63) → (target_frames, 63)"""
         T = traj.shape[0]
@@ -62,24 +51,7 @@ class Preprocessor(Module):
         self.lost_frames   = 0
         return {}
 
-    def _process(self) -> np.ndarray:
-        """Resample → Feature Engineering (normalization happens inside _extract_features)"""
-        raw = np.array(self.history, dtype=np.float32)
-
-        # Schritt 1: normalize_coords
-        norm = _normalize_coords(raw)
-        print(f"nach normalize_coords: min={norm.min():.4f}  max={norm.max():.4f}")
-
-        # Schritt 2: resample
-        res = self._resample(norm)
-        print(f"nach resample:         min={res.min():.4f}  max={res.max():.4f}")
-
-        # Schritt 3: extract_features
-        feat = _extract_features(res)
-        print(f"nach extract_features: min={feat.min():.4f}  max={feat.max():.4f}")
-
-       
-        return feat
+    
     def step(self, data):
         result = data.get("detector")
         result_trajectory = None
@@ -87,22 +59,26 @@ class Preprocessor(Module):
         if result is not None and result.hand_landmarks:
             self.lost_frames = 0
             landmarks = result.hand_landmarks[0]
-            frame = [coord for lm in landmarks for coord in (lm.x, lm.y, lm.z)]
+            frame = [coord for lm in landmarks for coord in (lm.x, lm.y)]
             self.history.append(frame)
 
             if len(self.history) >= self.min_steps:
                 raw = np.array(self.history, dtype=np.float32)
-                norm = _normalize_coords(raw)
-                res  = self._resample(norm)       # immer auf 65 Frames skalieren
-                feat = _extract_features(res)
-                result_trajectory = feat          # ← bei jedem Frame senden
+                norm = _normalize_trajectory_only(raw)
+                res  = self._resample(norm)     
+                result_trajectory = res        
             
 
         else:
             self.lost_frames += 1
             if self.lost_frames > self.max_lost:
                 if len(self.history) >= self.min_steps:
-                    result_trajectory = self._process()
+                    raw = np.array(self.history, dtype=np.float32)
+                    norm = _normalize_trajectory_only(raw)
+                    res  = self._resample(norm)     
+                    result_trajectory = res
+
+                    
                 self.history.clear()
                 self.lost_frames = 0
 
