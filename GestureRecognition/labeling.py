@@ -116,7 +116,7 @@ def _resample(traj: np.ndarray, target_frames: int = 65) -> np.ndarray:
         fill_value="extrapolate"
     )
     return f(np.linspace(0, 1, target_frames)).astype(np.float32)
-TARGET_FRAMES = 65
+TARGET_FRAMES = 70
 
 def _normalize_trajectory_only(pts_flat: np.ndarray) -> np.ndarray:
     """
@@ -124,26 +124,27 @@ def _normalize_trajectory_only(pts_flat: np.ndarray) -> np.ndarray:
     perfekt in eine Einheitsbox [0, 1] passt. Die restlichen Hand-Landmarks 
     werden relativ dazu mitverschrumpft/-geweitet, ohne ihre Form zu verlieren.
     """
-    T = pts_flat.shape[0]
+    T = pts_flat.shape[0] # T ist die Anzahl der Frames in der Sequenz
     lm = pts_flat.reshape(T, 21, 2)
     
-    # 1. Extrahiere die Flugbahn NUR von Landmark 8 (Zeigefingerspitze)
-    # Form: (T, 2)
+   # Extrahiere die Flugbahn NUR von Landmark 8 (Zeigefingerspitze)
+   
     tip_trajectory = lm[:, 8, :]
     
-    # 2. Finde die Bounding-Box NUR für die Zeichnung der Fingerspitze
+    # Finde die Bounding-Box NUR für die Zeichnung der Fingerspitze, das heißt, wir wollen die minimalen und maximalen X- und Y-Koordinaten der Fingerspitze über alle Frames hinweg bestimmen.
     min_coords = tip_trajectory.min(axis=0)  # [min_x, min_y] der Zeichnung
     max_coords = tip_trajectory.max(axis=0)  # [max_x, max_y] der Zeichnung
     
-    # 3. Berechne die maximale Ausdehnung der Zeichnung (Breite oder Höhe)
+    #Berechne die maximale Ausdehnung der Zeichnung (Breite oder Höhe)
     span = max_coords - min_coords
     max_span = np.maximum(span.max(), 1e-6)  # Verhindert Division durch 0 bei Standbildern
     
-    # 4. Wende diese Skalierung auf ALLE 21 Landmarks an
+    #Wende diese Skalierung auf ALLE 21 Landmarks an
     # Wir ziehen von jedem Punkt das Minimum der Fingerspitze ab und teilen durch die Fingerspitzen-Spanne
     for t in range(T):
         lm[t] = (lm[t] - min_coords) / max_span
         
+    
     return lm.reshape(T, 42)
  
  
@@ -170,7 +171,7 @@ def dataset_building(output_path):
         for npy in sorted(label_dir.glob("*.npy")):
             pts = np.load(npy)  # Rohdaten laden
 
-            # 2. Jetzt erst flachklopfen auf (T, 42)
+            # 2. Jetzt erst flachklopfen auf (T, 42), da wir nur X- und Y-Koordinaten brauchen (21 Landmarks * 2 Koordinaten)
             pts_flat = pts.reshape(len(pts), 42)
 
             if len(pts_flat) < MIN_FRAMES:
@@ -179,7 +180,7 @@ def dataset_building(output_path):
 
             pts_normalized = _normalize_trajectory_only(pts_flat)
 
-            # 3. Auf feste Frame-Anzahl bringen -> Liefert (65, 42)
+            #  Auf feste Frame-Anzahl bringen -> Liefert (65, 42)
             seq = _resample(pts_normalized, TARGET_FRAMES) 
             
             X.append(seq)
