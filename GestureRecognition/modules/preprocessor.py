@@ -27,8 +27,7 @@ class Preprocessor(Module):
         self.lost_frames = 0 
         return {}
 
-    def _resample(traj: np.ndarray, target_frames: int = 65) -> np.ndarray: # diese Funktion macht die Interpolation der Trajektorie auf eine feste Länge (0, 1)
-        """Interpoliert (T, 63) → (target_frames, 63)"""
+    def _resample(self, traj: np.ndarray, target_frames: int = 70) -> np.ndarray: # diese Funktion macht die Interpolation der Trajektorie auf eine feste Länge (0, 1)
         T = traj.shape[0]
         if T == target_frames:
             return traj
