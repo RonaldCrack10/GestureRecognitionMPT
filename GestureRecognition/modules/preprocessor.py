@@ -15,21 +15,22 @@ class Preprocessor(Module):
             name="preprocessor",
         )
 
-    def _is_fist(self, landmarks, threshold: float = 0.15) -> bool:
-        """Gibt True zurück wenn die Hand zur Faust geschlossen ist."""
-        FINGERTIPS = [8, 12, 16, 20]
-        wrist = np.array([landmarks[0].x, landmarks[0].y, landmarks[0].z])
-        for tip_idx in FINGERTIPS:
-            tip = np.array([landmarks[tip_idx].x, landmarks[tip_idx].y, landmarks[tip_idx].z])
-            if np.linalg.norm(tip - wrist) > threshold:
-                return False
-        return True
 
-   
-    def _resample(self, traj: np.ndarray) -> np.ndarray:
+    def start(self, data):
+       
+        config = data.get("config", {}).get("preprocessor", {})
+        self.buffer_size = config.get("buffer_size", 140) # maximale Anzahl an Frames, die im Speicher gehalten werden
+        self.max_lost = config.get("max_lost", 10) # maximale Anzahl an aufeinanderfolgenden Frames, in denen keine Hand erkannt wird, bevor die Sequenz als beendet betrachtet wird
+        self.min_steps = config.get("min_steps", 15) # minimale Anzahl an Frames, die für eine gültige Sequenz benötigt werden
+        self.target_frames = config.get("target_frames", 70) 
+        self.history = deque(maxlen=self.buffer_size) # Speichert die letzten N Frames der Handlandmarken
+        self.lost_frames = 0 
+        return {}
+
+    def _resample(traj: np.ndarray, target_frames: int = 65) -> np.ndarray: # diese Funktion macht die Interpolation der Trajektorie auf eine feste Länge (0, 1)
         """Interpoliert (T, 63) → (target_frames, 63)"""
         T = traj.shape[0]
-        if T == self.target_frames:
+        if T == target_frames:
             return traj
         f = interp1d(
             np.linspace(0, 1, T),
@@ -38,18 +39,7 @@ class Preprocessor(Module):
             kind='linear',
             fill_value="extrapolate"
         )
-        return f(np.linspace(0, 1, self.target_frames)).astype(np.float32)
-
-    def start(self, data):
-       
-        config = data.get("config", {}).get("preprocessor", {})
-        self.buffer_size   = config.get("buffer_size",   140)
-        self.max_lost      = config.get("max_lost",       10)
-        self.min_steps     = config.get("min_steps",      15)
-        self.target_frames = config.get("target_frames",  65)
-        self.history       = deque(maxlen=self.buffer_size)
-        self.lost_frames   = 0
-        return {}
+        return f(np.linspace(0, 1, target_frames)).astype(np.float32)
 
     
     def step(self, data):

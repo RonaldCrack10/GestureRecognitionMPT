@@ -22,10 +22,10 @@ class HMMClassifier:
         self.random_state  = random_state
         self.test_size = test_size
 
-        self.models  : dict = {}   
-        self.classes : list = []
-        self.test_data : dict = {}  # Store test data separately for proper evaluation
-        self.test_lengths : dict = {}  # Store test sequence lengths per class
+        self.models : dict = {}  # Speichert die trainierten HMM-Modelle pro Klasse
+        self.classes : list = [] # Liste der Klassenlabels
+        self.test_data : dict = {}  # Speichert Testdaten pro Klasse
+        self.test_lengths : dict = {}  # Speichert Testsequenzlängen pro Klasse
 
    
 
@@ -74,10 +74,10 @@ class HMMClassifier:
             lens_train = [len(s) for s in train_seqs]
 
             model = hmm.GaussianHMM(
-                n_components    = self.n_components,
+                n_components = self.n_components,
                 covariance_type = "diag",
-                n_iter          = self.n_iter,
-                random_state    = self.random_state,
+                n_iter = self.n_iter,
+                random_state = self.random_state,
 
                 min_covar=1e-2  # Verhindert zu kleine Varianzen, die zu Singularitäten führen können
             )
@@ -85,13 +85,13 @@ class HMMClassifier:
             self.models[label] = model
 
             # Evaluation auf Trainings- und Testdaten
-            train_ll = model.score(X_train, lens_train) / sum(lens_train)
+            train = model.score(X_train, lens_train) / sum(lens_train)
 
             print(f"  ✓ '{label}':  {n_train} train  "
-                  f"train ll: {train_ll:.3f} ")
+                  f"train ll: {train:.3f} ")
 
         print(f"\nTraining abgeschlossen — {len(self.models)} Modelle trainiert.")
-        return self
+        return self # stellt sicher, dass die Methode eine Instanz von HMMClassifier zurückgibt, was nützlich für Method Chaining ist.
 
 
     def decision_function(self, X: np.ndarray, lengths: list) -> np.ndarray: # -> shape (n_sequences, n_classes)

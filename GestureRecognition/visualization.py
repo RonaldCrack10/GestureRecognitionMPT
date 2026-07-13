@@ -181,5 +181,5 @@ def replay_recordings():
     plt.show()
 
 if __name__ == "__main__":
-    # visualize_dataset("P") #redo E F
+    visualize_dataset("P") #redo L E C
     replay_recordings()

@@ -39,11 +39,11 @@ class HMMModule(Module):
             best_label = self.model.predict_single(seq)
             best_score = float(np.max(scores_arr))
             seq = np.array(trajectory, dtype=np.float32)
-            print(f"seq shape: {seq.shape}")
-            print(f"seq min:   {seq.min():.4f}")
-            print(f"seq max:   {seq.max():.4f}")
+            # print(f"seq shape: {seq.shape}")
+            # print(f"seq min:   {seq.min():.4f}")
+            # print(f"seq max:   {seq.max():.4f}")
             scores_arr = self.model.decision_function(seq, [len(seq)])[0]
-            print(f"scores: {dict(zip(self.model.classes, scores_arr))}")
+            # print(f"scores: {dict(zip(self.model.classes, scores_arr))}")
 
             self.last_result = {
                 "label":  best_label,
@@ -63,7 +63,7 @@ class HMMModule(Module):
             f"{self.last_result['label']}  {self.last_result['score']:.2f}",
             (int(width * 0.05), int(height * 0.1)),
             fontScale = 1.5,
-            color= bgr("#FC0000"),
+            color= bgr("#00FC15"),
             thickness=4
         )
         

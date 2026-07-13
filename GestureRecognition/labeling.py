@@ -103,7 +103,7 @@ def _single_recording(save_path: Path, finger_idx: int): # Diese Funktion wird i
 
 
 
-def _resample(traj: np.ndarray, target_frames: int = 65) -> np.ndarray:
+def _resample(traj: np.ndarray, target_frames: int = 65) -> np.ndarray:  
     """Interpoliert (T, 63) → (target_frames, 63)"""
     T = traj.shape[0]
     if T == target_frames:
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         )
     else:
         
-        GESTEN    = ["O", "E"]     # Gesten anpassen WP
+        GESTEN    = ["P"]     # Gesten anpassen WP
         AUFNAHMEN = 20      # Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:

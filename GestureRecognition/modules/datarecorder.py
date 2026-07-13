@@ -49,7 +49,7 @@ class DataRecorder(Module):
         while msvcrt.kbhit():
             msvcrt.getch()
 
-        print("\n  ● Aufnahme läuft — ESC zum Speichern drücken")
+        print("\n Aufnahme läuft — ESC zum Speichern drücken")
         return {}
 
     
@@ -58,7 +58,7 @@ class DataRecorder(Module):
         det = data.get("detector")
         if det is not None and det.hand_landmarks:
             landmarks = det.hand_landmarks[0]  # alle 21 Landmarks
-            frame = [[lm.x, lm.y] for lm in landmarks]  # (21, 3)
+            frame = [[lm.x, lm.y] for lm in landmarks]  
             self.points.append(frame)
 
         if msvcrt.kbhit():
