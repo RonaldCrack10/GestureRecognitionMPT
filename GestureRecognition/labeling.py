@@ -103,8 +103,8 @@ def _single_recording(save_path: Path, finger_idx: int): # Diese Funktion wird i
 
 
 
-def _resample(traj: np.ndarray, target_frames: int = 65) -> np.ndarray:  
-    """Interpoliert (T, 63) → (target_frames, 63)"""
+def _resample(traj: np.ndarray, target_frames: int = 70) -> np.ndarray:  
+    
     T = traj.shape[0]
     if T == target_frames:
         return traj
