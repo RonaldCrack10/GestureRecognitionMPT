@@ -19,7 +19,7 @@ labels = ds["labels"]
 n = len(lengths)
 
 perm = rng.permutation(n)
-n_test = int(n * 0.15)
+n_test = int(n * 0.25)
 train_idx = perm[n_test:]
 test_idx = perm[:n_test]
 
