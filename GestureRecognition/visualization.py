@@ -184,5 +184,5 @@ def replay_recordings():
 
 
 if __name__ == "__main__":
-    visualize_dataset("U") #redo jhu
-    #replay_recordings()
+    #visualize_dataset("U") #redo jhu
+    replay_recordings()

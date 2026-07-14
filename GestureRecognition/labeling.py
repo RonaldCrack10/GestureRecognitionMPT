@@ -186,7 +186,7 @@ def dataset_building(output_path):
             X.append(seq)
             lengths.append(len(seq))
             labels.append(label)
-            print(f"  ✓ {label}/{npy.name}: {len(seq)} Frames")
+            print(f"{label}/{npy.name}: {len(seq)} Frames")
 
     if not X:
         print("Dataset leer — keine Daten gefunden.")
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         )
     else:
         
-        GESTEN = ["M", "N", "U"]     # Gesten anpassen WP
+        GESTEN = ["Q", "R"]     # Gesten anpassen WP
         AUFNAHMEN = 5      # Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:
