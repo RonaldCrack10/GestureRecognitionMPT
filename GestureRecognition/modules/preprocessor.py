@@ -30,18 +30,6 @@ class Preprocessor(Module):
         self.paused = False  
         return {}
 
-    def _resample(self, traj: np.ndarray, target_frames: int = 70) -> np.ndarray: # diese Funktion macht die Interpolation der Trajektorie auf eine feste Länge (0, 1)
-        T = traj.shape[0]
-        if T == target_frames:
-            return traj
-        f = interp1d(
-            np.linspace(0, 1, T),
-            traj,
-            axis=0,
-            kind='linear',
-            fill_value="extrapolate"
-        )
-        return f(np.linspace(0, 1, target_frames)).astype(np.float32)
 
     
     def step(self, data):
@@ -71,8 +59,7 @@ class Preprocessor(Module):
 
             if len(self.history) >= self.min_steps:
                 raw = np.array(self.history, dtype=np.float32)
-                norm = _normalize_trajectory_only(raw)
-                # res  = self._resample(norm)     
+                norm = _normalize_trajectory_only(raw)    
                 result_trajectory = norm        
             
 
@@ -81,8 +68,7 @@ class Preprocessor(Module):
             if self.lost_frames > self.max_lost:
                 if len(self.history) >= self.min_steps:
                     raw = np.array(self.history, dtype=np.float32)
-                    norm = _normalize_trajectory_only(raw)
-                    #res  = self._resample(norm)     
+                    norm = _normalize_trajectory_only(raw)    
                     result_trajectory = norm
 
                     

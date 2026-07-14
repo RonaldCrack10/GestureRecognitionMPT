@@ -102,20 +102,6 @@ def _single_recording(save_path: Path, finger_idx: int): # Diese Funktion wird i
         pass
 
 
-
-def _resample(traj: np.ndarray, target_frames: int = 70) -> np.ndarray:  
-    
-    T = traj.shape[0]
-    if T == target_frames:
-        return traj
-    f = interp1d(
-        np.linspace(0, 1, T),
-        traj,
-        axis=0,
-        kind='linear',
-        fill_value="extrapolate"
-    )
-    return f(np.linspace(0, 1, target_frames)).astype(np.float32)
 TARGET_FRAMES = 70
 
 def _normalize_trajectory_only(pts_flat: np.ndarray) -> np.ndarray:
@@ -127,7 +113,6 @@ def _normalize_trajectory_only(pts_flat: np.ndarray) -> np.ndarray:
     T = pts_flat.shape[0] # T ist die Anzahl der Frames in der Sequenz
     lm = pts_flat.reshape(T, 21, 2)
     
-   # Extrahiere die Flugbahn NUR von Landmark 8 (Zeigefingerspitze)
    
     tip_trajectory = lm[:, 8, :]
     
@@ -180,8 +165,7 @@ def dataset_building(output_path):
 
             pts_normalized = _normalize_trajectory_only(pts_flat)
             seq = pts_normalized
-            #  Auf feste Frame-Anzahl bringen -> Liefert (65, 42)
-            #seq = _resample(pts_normalized, TARGET_FRAMES) 
+            
             
             X.append(seq)
             lengths.append(len(seq))
