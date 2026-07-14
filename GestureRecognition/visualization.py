@@ -7,6 +7,7 @@ from collections import defaultdict
 from matplotlib.widgets import Button
 from GestureRecognition.labeling import _normalize_trajectory_only
 
+
 CONNECTIONS = [
     (0,1),(1,2),(2,3),(3,4),
     (0,5),(5,6),(6,7),(7,8),
@@ -16,7 +17,7 @@ CONNECTIONS = [
     (5,9),(9,13),(13,17),
 ]
 
-TARGET_FRAMES = 65
+TARGET_FRAMES = 70
 
 def visualize_dataset(label: str):
     data_dir = Path("data") / label
@@ -32,18 +33,18 @@ def visualize_dataset(label: str):
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     fig.suptitle(f"Klasse: {label}  |  Navigation: ← →  |  D = löschen markieren", fontsize=13)
 
-    ax_hand  = axes[0]
-    ax_traj  = axes[1]
+    ax_hand = axes[0]
+    ax_traj = axes[1]
 
-    ax_prev   = plt.axes([0.05, 0.02, 0.12, 0.06])
-    ax_next   = plt.axes([0.19, 0.02, 0.12, 0.06])
+    ax_prev = plt.axes([0.05, 0.02, 0.12, 0.06])
+    ax_next = plt.axes([0.19, 0.02, 0.12, 0.06])
     ax_delete = plt.axes([0.44, 0.02, 0.15, 0.06])
-    ax_save   = plt.axes([0.80, 0.02, 0.15, 0.06])
+    ax_save = plt.axes([0.80, 0.02, 0.15, 0.06])
 
-    btn_prev   = Button(ax_prev,   '← Zurück')
-    btn_next   = Button(ax_next,   'Weiter →')
+    btn_prev = Button(ax_prev,   'Zurück')
+    btn_next = Button(ax_next,   'Weiter')
     btn_delete = Button(ax_delete, 'Löschen markieren', color='salmon')
-    btn_save   = Button(ax_save,   'Änderungen speichern', color='lightgreen')
+    btn_save = Button(ax_save,   'Änderungen speichern', color='lightgreen')
 
     def draw(idx):
         ax_hand.clear()
@@ -61,7 +62,7 @@ def visualize_dataset(label: str):
 
         marked = npy in to_delete
         color = 'red' if marked else 'black'
-        status = '🗑 MARKIERT ZUM LÖSCHEN' if marked else ''
+        status = 'MARKIERT ZUM LÖSCHEN' if marked else ''
 
         # Mittlerer Frame für Handform
         mid = len(pts_geom) // 2
@@ -110,10 +111,10 @@ def visualize_dataset(label: str):
         npy = npy_files[current[0]]
         if npy in to_delete:
             to_delete.remove(npy)
-            print(f"  ↩ Markierung aufgehoben: {npy.name}")
+            print(f"Markierung aufgehoben: {npy.name}")
         else:
             to_delete.append(npy)
-            print(f"  🗑 Markiert: {npy.name}")
+            print(f"Markiert: {npy.name}")
         draw(current[0])
 
     def on_save(event):
@@ -180,6 +181,8 @@ def replay_recordings():
     plt.tight_layout()
     plt.show()
 
+
+
 if __name__ == "__main__":
-    visualize_dataset("P") #redo L E C
-    replay_recordings()
+    visualize_dataset("U") #redo jhu
+    #replay_recordings()

@@ -3,6 +3,12 @@ import numpy as np
 from GestureRecognition.hmmclassifier import HMMClassifier
 from collections import Counter
 
+
+def augment_noise(seq: np.ndarray, noise_level: float = 0.005) -> np.ndarray:
+    """Fügt der Sequenz (T, 42) ein leichtes Sensorrauschen hinzu."""
+    noise = np.random.normal(0, noise_level, seq.shape)
+    return (seq + noise).astype(np.float32)
+
 with open("data/dataset.pickle", "rb") as f:
     ds = pickle.load(f)
 
@@ -13,7 +19,7 @@ labels = ds["labels"]
 n = len(lengths)
 
 perm = rng.permutation(n)
-n_test = int(n * 0.2)
+n_test = int(n * 0.15)
 train_idx = perm[n_test:]
 test_idx = perm[:n_test]
 
@@ -35,7 +41,7 @@ lens_train = [len(s) for s in train_seqs]
 lens_test  = [len(s) for s in test_seqs]
 
 
-clf = HMMClassifier(n_components=7, n_iter=200, test_size=0.0)  # kein interner split
+clf = HMMClassifier(n_components=6, n_iter=200, test_size=0.0)  # kein interner split
 clf.fit(X_train, lens_train, train_labels)
 clf.evaluate(X_test, lens_test, test_labels)
 clf.save("data/hmm_model.pickle")

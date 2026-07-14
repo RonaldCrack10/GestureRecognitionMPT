@@ -179,9 +179,9 @@ def dataset_building(output_path):
                 continue
 
             pts_normalized = _normalize_trajectory_only(pts_flat)
-
+            seq = pts_normalized
             #  Auf feste Frame-Anzahl bringen -> Liefert (65, 42)
-            seq = _resample(pts_normalized, TARGET_FRAMES) 
+            #seq = _resample(pts_normalized, TARGET_FRAMES) 
             
             X.append(seq)
             lengths.append(len(seq))
@@ -224,8 +224,8 @@ if __name__ == "__main__":
         )
     else:
         
-        GESTEN    = ["P"]     # Gesten anpassen WP
-        AUFNAHMEN = 20      # Anzahl Aufnahmen pro Geste
+        GESTEN = ["M", "N", "U"]     # Gesten anpassen WP
+        AUFNAHMEN = 5      # Anzahl Aufnahmen pro Geste
  
         for geste in GESTEN:
             data_labeling(times=AUFNAHMEN, label=geste)

@@ -1,3 +1,5 @@
+import msvcrt
+
 from SignalHub import GALY, Module
 from collections import deque
 import numpy as np
@@ -24,7 +26,8 @@ class Preprocessor(Module):
         self.min_steps = config.get("min_steps", 15) # minimale Anzahl an Frames, die für eine gültige Sequenz benötigt werden
         self.target_frames = config.get("target_frames", 70) 
         self.history = deque(maxlen=self.buffer_size) # Speichert die letzten N Frames der Handlandmarken
-        self.lost_frames = 0 
+        self.lost_frames = 0
+        self.paused = False  
         return {}
 
     def _resample(self, traj: np.ndarray, target_frames: int = 70) -> np.ndarray: # diese Funktion macht die Interpolation der Trajektorie auf eine feste Länge (0, 1)
@@ -42,6 +45,21 @@ class Preprocessor(Module):
 
     
     def step(self, data):
+
+        if msvcrt.kbhit():
+            key = msvcrt.getch()
+            if key == b"a" : 
+                self.paused = not self.paused
+                if self.paused:
+                    print("Detektion pausiert. Drücke Leertaste zum Fortsetzen.")
+                    self.history.clear()  # Leere den Verlauf, wenn die Detektion pausiert wird
+                else:
+                    print("Detektion fortgesetzt.")
+
+        if self.paused:
+            return {self.outputSignal: None}
+
+
         result = data.get("detector")
         result_trajectory = None
 
@@ -54,8 +72,8 @@ class Preprocessor(Module):
             if len(self.history) >= self.min_steps:
                 raw = np.array(self.history, dtype=np.float32)
                 norm = _normalize_trajectory_only(raw)
-                res  = self._resample(norm)     
-                result_trajectory = res        
+                # res  = self._resample(norm)     
+                result_trajectory = norm        
             
 
         else:
@@ -64,8 +82,8 @@ class Preprocessor(Module):
                 if len(self.history) >= self.min_steps:
                     raw = np.array(self.history, dtype=np.float32)
                     norm = _normalize_trajectory_only(raw)
-                    res  = self._resample(norm)     
-                    result_trajectory = res
+                    #res  = self._resample(norm)     
+                    result_trajectory = norm
 
                     
                 self.history.clear()
